@@ -1606,13 +1606,14 @@ async function sendInvoiceEmail(){
     btn.textContent='Envoi en cours...';btn.disabled=true;
 
     // Convertir le PDF en blob base64
-    const pdfBlob=await html2pdf().set({
+    const pdfB64=await html2pdf().set({
       margin:0,image:{type:'jpeg',quality:.95},
-      html2canvas:{scale:2},jsPDF:{unit:'mm',format:'a4'}
-    }).from(pdfEl).outputPdf('blob');
+      html2canvas:{scale:2,useCORS:true},
+      jsPDF:{unit:'mm',format:'a4'}
+    }).from(pdfEl).outputPdf('datauristring');
 
-    const reader=new FileReader();
-    const pdfB64=await new Promise(res=>{reader.onload=()=>res(reader.result.split(',')[1]);reader.readAsDataURL(pdfBlob);});
+    // Extraire uniquement la partie base64 (sans le préfixe data:application/pdf;base64,)
+    const pdfBase64Clean = pdfB64.split(',')[1];
 
     // Appeler le webhook Make
     const payload={
@@ -1620,7 +1621,7 @@ async function sendInvoiceEmail(){
       facture_num: currentFac.num,
       facture_total: fmtMoney(currentFac.total),
       client_nom: currentFac.clientNom,
-      pdf_base64: pdfB64,
+      pdf_base64: pdfBase64Clean,
       pdf_filename: 'facture-'+currentFac.num+'.pdf'
     };
 
