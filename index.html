@@ -1104,11 +1104,11 @@ function buildPdf(f){
   if(f.clientSiret) h.push('<div style="font-size:11px;color:#aaa;margin-top:3px">SIRET : '+esc(f.clientSiret)+'</div>');
   h.push('</div></div>');
   h.push('<table style="width:100%;border-collapse:collapse;margin-bottom:24px">');
-  h.push('<thead><tr style="background:#1a1a2e">');
-  h.push('<th style="padding:10px 16px;text-align:left;font-size:11px;color:white;font-weight:600;text-transform:uppercase">Prestation</th>');
-  h.push('<th style="padding:10px 16px;text-align:center;font-size:11px;color:white;font-weight:600;text-transform:uppercase">Qté</th>');
-  h.push('<th style="padding:10px 16px;text-align:right;font-size:11px;color:white;font-weight:600;text-transform:uppercase">P.U. HT</th>');
-  h.push('<th style="padding:10px 16px;text-align:right;font-size:11px;color:white;font-weight:600;text-transform:uppercase">Total HT</th>');
+  h.push('<thead><tr style="background:#e8e8e8;border-bottom:2px solid #1a1a2e">');
+  h.push('<th style="padding:10px 16px;text-align:left;font-size:11px;color:#1a1a2e;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Prestation</th>');
+  h.push('<th style="padding:10px 16px;text-align:center;font-size:11px;color:#1a1a2e;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Qté</th>');
+  h.push('<th style="padding:10px 16px;text-align:right;font-size:11px;color:#1a1a2e;font-weight:700;text-transform:uppercase;letter-spacing:.5px">P.U. HT</th>');
+  h.push('<th style="padding:10px 16px;text-align:right;font-size:11px;color:#1a1a2e;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Total HT</th>');
   h.push('</tr></thead><tbody>'+fv+'</tbody></table>');
   h.push('<div style="display:flex;justify-content:flex-end;margin-bottom:36px">');
   h.push('<div style="min-width:260px">');
