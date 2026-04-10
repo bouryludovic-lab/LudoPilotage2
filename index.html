@@ -27,6 +27,7 @@ const AT = {
       email:     'fld5HBQXkvPuCuy0S',
       notes:     'fldJphY2HZEcLyU8U',
       emailEnvoye:'fldQQFX8GjgST3GoH',
+      pdf:        'fld0STwue4xaMjOwX',
     },
     clients: {
       nom:       'fldKAzAwGwPPtAmR0',
@@ -1595,34 +1596,52 @@ async function sendInvoiceEmail(){
   if(!to){toast('Entrez une adresse email','error');return;}
   const cfg=getConfig();
   if(!cfg.webhook){toast("Aucun webhook Make configuré","error");return;}
+  if(!currentFac?.atId){toast('Facture non synchronisée avec Airtable','error');return;}
 
-  // Générer le PDF en base64
   const pdfEl=document.getElementById('pdf-doc');
   if(!pdfEl){toast("Ouvrez d'abord l'aperçu de la facture",'error');return;}
 
-  toast('Génération du PDF en cours...','');
-  try{
-    const btn=document.querySelector('#modal-send .btn-primary');
-    btn.textContent='Envoi en cours...';btn.disabled=true;
+  const btn=document.querySelector('#modal-send .btn-primary');
+  btn.textContent='Génération PDF...';btn.disabled=true;
 
-    // Convertir le PDF en blob base64
-    const pdfB64=await html2pdf().set({
+  try{
+    // 1. Générer le PDF en base64
+    const pdfDataUri=await html2pdf().set({
       margin:0,image:{type:'jpeg',quality:.95},
       html2canvas:{scale:2,useCORS:true},
       jsPDF:{unit:'mm',format:'a4'}
     }).from(pdfEl).outputPdf('datauristring');
 
-    // Extraire uniquement la partie base64 (sans le préfixe data:application/pdf;base64,)
-    const pdfBase64Clean = pdfB64.split(',')[1];
+    // 2. Uploader le PDF dans Airtable (champ Attachments)
+    btn.textContent='Upload vers Airtable...';
+    const filename='facture-'+currentFac.num+'.pdf';
+    const uploadRes=await fetch(
+      `https://api.airtable.com/v0/${AT.BASE}/${AT.TABLES.factures}/${currentFac.atId}`,
+      {
+        method:'PATCH',
+        headers:AT.headers(),
+        body:JSON.stringify({fields:{
+          [AT.FIELDS.factures.pdf]:[{url:pdfDataUri,filename}]
+        }})
+      }
+    );
 
-    // Appeler le webhook Make
+    let pdfUrl=null;
+    if(uploadRes.ok){
+      const data=await uploadRes.json();
+      const attachments=data.fields?.[AT.FIELDS.factures.pdf]||[];
+      pdfUrl=attachments[0]?.url||null;
+    }
+
+    // 3. Envoyer le webhook Make avec l'URL Airtable
+    btn.textContent='Envoi en cours...';
     const payload={
       to, subject, body,
       facture_num: currentFac.num,
       facture_total: fmtMoney(currentFac.total),
       client_nom: currentFac.clientNom,
-      pdf_base64: pdfBase64Clean,
-      pdf_filename: 'facture-'+currentFac.num+'.pdf'
+      pdf_url: pdfUrl,
+      pdf_filename: filename
     };
 
     const r=await fetch(cfg.webhook,{
@@ -1632,20 +1651,17 @@ async function sendInvoiceEmail(){
     });
 
     if(r.ok){
-      // Marquer "Email envoyé" dans Airtable
       if(currentFac.atId&&AT.token()){
         await AT.update(AT.TABLES.factures,currentFac.atId,{[AT.FIELDS.factures.emailEnvoye]:true});
       }
       closeModal('modal-send');
       toast('Facture envoyée à '+to+' !','success');
-      btn.textContent='Envoyer';btn.disabled=false;
     }else{
-      toast("Erreur lors de l'envoi — vérifiez votre webhook Make","error");
-      btn.textContent='Envoyer';btn.disabled=false;
+      toast("Erreur webhook Make — vérifiez la configuration","error");
     }
   }catch(e){
     toast('Erreur : '+e.message,'error');
-    const btn=document.querySelector('#modal-send .btn-primary');
+  }finally{
     btn.textContent='Envoyer';btn.disabled=false;
   }
 }
