@@ -26,6 +26,7 @@ const AT = {
       paiement:  'fldO41dH1Y4Z7Nf5E',
       email:     'fld5HBQXkvPuCuy0S',
       notes:     'fldJphY2HZEcLyU8U',
+      emailEnvoye:'fldQQFX8GjgST3GoH',
     },
     clients: {
       nom:       'fldKAzAwGwPPtAmR0',
@@ -765,9 +766,47 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeModal('modal-pdf')">Fermer</button>
       <button class="btn btn-secondary" onclick="markPaid()">✓ Marquer payée</button>
+      <button class="btn btn-primary" onclick="openSendModal()" style="background:#059669">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
+        Envoyer par email
+      </button>
       <button class="btn btn-primary" onclick="dlPDF()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Télécharger PDF
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- MODAL ENVOI EMAIL -->
+<div class="overlay" id="modal-send">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Envoyer la facture par email</div>
+      <button class="btn btn-ghost btn-icon" onclick="closeModal('modal-send')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label class="lbl">Destinataire</label>
+        <input id="send-to" placeholder="email@client.fr"/>
+      </div>
+      <div class="field" style="margin-top:12px"><label class="lbl">Objet</label>
+        <input id="send-subject" placeholder="Facture N° ..."/>
+      </div>
+      <div class="field" style="margin-top:12px"><label class="lbl">Message</label>
+        <textarea id="send-body" style="min-height:140px"></textarea>
+      </div>
+      <div id="send-webhook-warn" style="display:none;margin-top:12px;padding:10px 12px;background:var(--amber-50);border:1px solid var(--amber-500);border-radius:var(--r);font-size:12px;color:var(--amber-700)">
+        ⚠️ Aucun webhook Make configuré. Configurez-le dans <strong>Telegram & Make</strong> pour activer l'envoi automatique.
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('modal-send')">Annuler</button>
+      <button class="btn btn-primary" onclick="sendInvoiceEmail()" style="background:#059669">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
+        Envoyer
       </button>
     </div>
   </div>
@@ -1514,6 +1553,88 @@ async function createClientFromBot(res){
   }
   C.push({id:atId||Date.now().toString(),atId,nom:res.nom,email:res.email||'',adresse:res.adresse||'',tel:'',siret:''});
   S.set('clients',C);
+}
+
+
+// ── ENVOI EMAIL ───────────────────────────────────────────────────────────────
+function openSendModal(){
+  if(!currentFac){return;}
+  const f=currentFac;
+  const p=getProfil();
+  document.getElementById('send-to').value=f.clientEmail||'';
+  document.getElementById('send-subject').value='Facture N° '+f.num+' — '+fmtMoney(f.total);
+  document.getElementById('send-body').value=
+    `Bonjour,\n\n`+
+    `Veuillez trouver ci-joint la facture N° `+f.num+` d'un montant de `+fmtMoney(f.total)+`.\n\n`+
+    `Échéance : `+(f.echeanceLabel||`À réception`)+`\n\n`+
+    `N'hésitez pas à me contacter pour toute question.\n\n`+
+    `Cordialement,\n`+
+    (p.nom||'');
+  const cfg=getConfig();
+  document.getElementById('send-webhook-warn').style.display=cfg.webhook?'none':'block';
+  closeModal('modal-pdf');
+  openModal('modal-send');
+}
+
+async function sendInvoiceEmail(){
+  const to=document.getElementById('send-to').value.trim();
+  const subject=document.getElementById('send-subject').value.trim();
+  const body=document.getElementById('send-body').value.trim();
+  if(!to){toast('Entrez une adresse email','error');return;}
+  const cfg=getConfig();
+  if(!cfg.webhook){toast("Aucun webhook Make configuré","error");return;}
+
+  // Générer le PDF en base64
+  const pdfEl=document.getElementById('pdf-doc');
+  if(!pdfEl){toast("Ouvrez d'abord l'aperçu de la facture",'error');return;}
+
+  toast('Génération du PDF en cours...','');
+  try{
+    const btn=document.querySelector('#modal-send .btn-primary');
+    btn.textContent='Envoi en cours...';btn.disabled=true;
+
+    // Convertir le PDF en blob base64
+    const pdfBlob=await html2pdf().set({
+      margin:0,image:{type:'jpeg',quality:.95},
+      html2canvas:{scale:2},jsPDF:{unit:'mm',format:'a4'}
+    }).from(pdfEl).outputPdf('blob');
+
+    const reader=new FileReader();
+    const pdfB64=await new Promise(res=>{reader.onload=()=>res(reader.result.split(',')[1]);reader.readAsDataURL(pdfBlob);});
+
+    // Appeler le webhook Make
+    const payload={
+      to, subject, body,
+      facture_num: currentFac.num,
+      facture_total: fmtMoney(currentFac.total),
+      client_nom: currentFac.clientNom,
+      pdf_base64: pdfB64,
+      pdf_filename: 'facture-'+currentFac.num+'.pdf'
+    };
+
+    const r=await fetch(cfg.webhook,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-token':cfg.token||''},
+      body:JSON.stringify(payload)
+    });
+
+    if(r.ok){
+      // Marquer "Email envoyé" dans Airtable
+      if(currentFac.atId&&AT.token()){
+        await AT.update(AT.TABLES.factures,currentFac.atId,{[AT.FIELDS.factures.emailEnvoye]:true});
+      }
+      closeModal('modal-send');
+      toast('Facture envoyée à '+to+' !','success');
+      btn.textContent='Envoyer';btn.disabled=false;
+    }else{
+      toast("Erreur lors de l'envoi — vérifiez votre webhook Make","error");
+      btn.textContent='Envoyer';btn.disabled=false;
+    }
+  }catch(e){
+    toast('Erreur : '+e.message,'error');
+    const btn=document.querySelector('#modal-send .btn-primary');
+    btn.textContent='Envoyer';btn.disabled=false;
+  }
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
