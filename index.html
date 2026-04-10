@@ -909,7 +909,8 @@ function renderDash(){
     <td style="font-weight:600;color:var(--blue-600)">${fmtMoney(f.total)}</td>
     <td class="td-muted">${fmtDate(f.date)}</td>
     <td>${badge(f.statut)}</td>
-    <td><button class="btn btn-ghost btn-sm" onclick="openPdf('${f.id}')">PDF</button></td>
+    <td><button class="btn btn-ghost btn-sm" onclick="openPdf('${f.id}')">PDF</button>
+    <button class="btn btn-sm" style="background:#059669;color:white;border:none" onclick="quickSend('${f.id}')">✉</button></td>
   </tr>`).join('');
 }
 
@@ -930,6 +931,7 @@ function renderFac(){
     <td>${badge(f.statut)}</td>
     <td><div class="td-actions">
       <button class="btn btn-ghost btn-sm" onclick="openPdf('${f.id}')">PDF</button>
+      <button class="btn btn-sm" style="background:#059669;color:white;border:none;padding:5px 8px" onclick="quickSend('${f.id}')">✉</button>
       <button class="btn btn-ghost btn-sm" onclick="markPaidId('${f.id}')">✓</button>
       <button class="btn btn-danger btn-sm" onclick="delFac('${f.id}')">×</button>
     </div></td>
@@ -1555,6 +1557,16 @@ async function createClientFromBot(res){
   S.set('clients',C);
 }
 
+
+function quickSend(id){
+  const f=getFactures().find(x=>x.id===id);
+  if(!f){toast('Facture introuvable','error');return;}
+  currentFac=f;
+  // Générer l'aperçu PDF en arrière-plan
+  document.getElementById('pdf-wrap').innerHTML=buildPdf(f);
+  document.getElementById('pdf-modal-title').textContent='Facture '+f.num;
+  openSendModal();
+}
 
 // ── ENVOI EMAIL ───────────────────────────────────────────────────────────────
 function openSendModal(){
