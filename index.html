@@ -1911,22 +1911,32 @@ async function generatePdfDoc(f){
 }
 
 async function generatePdfBase64(f){
-  // Créer un div temporaire hors écran avec le HTML de la facture
-  const tmp = document.createElement('div');
-  tmp.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:white';
-  tmp.innerHTML = buildPdf(f);
-  document.body.appendChild(tmp);
+  // S'assurer que le PDF est rendu dans la modal
+  const pdfWrap = document.getElementById('pdf-wrap');
+  if(pdfWrap && !document.getElementById('pdf-doc')){
+    pdfWrap.innerHTML = buildPdf(f);
+  }
+  // Si toujours pas de pdf-doc, créer un div temporaire visible
+  let el = document.getElementById('pdf-doc');
+  let tmp = null;
+  if(!el){
+    tmp = document.createElement('div');
+    tmp.style.cssText = 'position:fixed;left:0;top:0;width:794px;background:white;z-index:-1';
+    tmp.innerHTML = buildPdf(f);
+    document.body.appendChild(tmp);
+    el = tmp.querySelector('#pdf-doc') || tmp;
+  }
   try {
     const dataUri = await html2pdf().set({
       margin: 0,
       filename: 'facture-'+f.num+'.pdf',
       image: {type:'jpeg', quality:0.98},
-      html2canvas: {scale:2, useCORS:true, logging:false},
+      html2canvas: {scale:2, useCORS:true, logging:false, allowTaint:true},
       jsPDF: {unit:'mm', format:'a4', orientation:'portrait'}
-    }).from(tmp).outputPdf('datauristring');
+    }).from(el).outputPdf('datauristring');
     return dataUri;
   } finally {
-    document.body.removeChild(tmp);
+    if(tmp) document.body.removeChild(tmp);
   }
 }
 
