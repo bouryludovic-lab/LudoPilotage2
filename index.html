@@ -500,6 +500,28 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
         </div>
       </div>
 
+      <!-- ASSISTANT IA dans le dashboard -->
+      <div class="card" style="border-color:var(--blue-200);background:linear-gradient(135deg,#eff6ff 0%,#f8faff 100%)">
+        <div class="card-header" style="padding-bottom:10px">
+          <div class="card-title" style="color:var(--blue-700)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+            Assistant IA
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-start;padding:0 20px 16px">
+          <textarea id="ai-input" placeholder="Tapez en langage naturel... Ex: Crée une facture pour Alegria de 500€ pour du conseil SEO" style="flex:1;min-height:52px;font-size:13px;border:1px solid var(--blue-200);border-radius:var(--r);padding:10px 12px;resize:none;background:white;font-family:inherit;color:var(--slate-700)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendToAI()}"></textarea>
+          <button class="btn btn-primary" onclick="sendToAI()" style="padding:12px 14px;flex-shrink:0;background:var(--blue-600)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
+          </button>
+        </div>
+        <div id="ai-result" style="display:none;margin:0 20px 16px;padding:10px 14px;border-radius:var(--r);font-size:13px;line-height:1.6;border:1px solid var(--blue-200);background:white"></div>
+        <div style="padding:0 20px 16px;display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="quickCmd('Quelles sont mes 5 dernières factures ?')">📋 Factures récentes</button>
+          <button class="btn btn-ghost btn-sm" onclick="quickCmd('Quel est mon CA ce mois ?')">📊 CA du mois</button>
+          <button class="btn btn-ghost btn-sm" onclick="quickCmd('Liste mes clients')">👥 Clients</button>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-header">
           <div>
@@ -666,33 +688,21 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
     <!-- TELEGRAM -->
     <div id="screen-telegram" class="screen">
 
-      <!-- SECTION ASSISTANT IA -->
-      <div class="form-section" style="border-color:var(--blue-300);background:linear-gradient(135deg,#eff6ff,#f8faff)">
-        <div class="form-section-title" style="color:var(--blue-700)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
-          Assistant IA
-        </div>
-        <p style="font-size:12px;color:var(--slate-500);margin-bottom:14px">Tapez en langage naturel — l'IA comprend et exécute.</p>
-        <div style="display:flex;gap:8px;align-items:flex-end">
-          <div class="field" style="flex:1;margin:0">
-            <textarea id="ai-input" placeholder="Ex: Crée une facture pour Alegria de 500€ pour du conseil SEO&#10;Ex: Montre mon CA du mois&#10;Ex: Ajoute un client : Dupont, dupont@mail.fr" style="min-height:70px;font-size:13px"></textarea>
-          </div>
-          <button class="btn btn-primary" onclick="sendToAI()" style="height:70px;padding:0 18px;flex-shrink:0">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
-          </button>
-        </div>
-        <div id="ai-result" style="display:none;margin-top:12px;padding:12px;border-radius:var(--r);font-size:13px;line-height:1.6;border:1px solid var(--blue-200);background:white"></div>
-        <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn btn-ghost btn-sm" onclick="quickCmd('Montre mes 5 dernières factures')">📋 Factures récentes</button>
-          <button class="btn btn-ghost btn-sm" onclick="quickCmd('Quel est mon CA ce mois ?')">📊 CA du mois</button>
-          <button class="btn btn-ghost btn-sm" onclick="quickCmd('Liste mes clients')">👥 Clients</button>
-        </div>
-      </div>
-
       <div class="form-section">
         <div class="form-section-title">Configuration Make</div>
         <div class="field"><label class="lbl">URL Webhook Make</label><input id="tg-webhook" placeholder="https://hook.eu2.make.com/xxxxx"/></div>
         <div class="field" style="margin-top:12px"><label class="lbl">Token de sécurité (header x-api-token)</label><input id="tg-token" placeholder="montoken-secret-123"/></div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">Assistant IA — Clé API Claude</div>
+        <div style="padding:10px 12px;background:var(--amber-50);border:1px solid var(--amber-500);border-radius:var(--r);margin-bottom:12px;font-size:12px;color:var(--amber-700)">
+          ⚠️ Votre clé API est stockée uniquement dans votre navigateur (localStorage), jamais dans le code.
+        </div>
+        <div class="field"><label class="lbl">Clé API Anthropic</label>
+          <input id="claude-key" type="password" placeholder="sk-ant-api03-xxxxxxxx"/>
+        </div>
+        <p style="font-size:11px;color:var(--slate-400);margin-top:6px">Obtenez votre clé sur <strong>console.anthropic.com</strong> → API Keys.</p>
       </div>
 
       <div class="form-section">
@@ -706,24 +716,7 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
         <p style="font-size:11px;color:var(--slate-400);margin-top:6px">Token avec permission <strong>Contents: Read &amp; Write</strong> sur le repo LudoPilotage2.</p>
       </div>
 
-      <div class="form-section">
-        <div class="form-section-title">Envoi d'emails — Resend</div>
-        <div style="padding:12px;background:var(--blue-50);border:1px solid var(--blue-200);border-radius:var(--r);margin-bottom:14px;font-size:12px;color:var(--blue-700)">
-          Resend envoie les factures par email avec le PDF en pièce jointe directement depuis votre navigateur. Créez un compte gratuit sur <strong>resend.com</strong> et collez votre clé API ici.
-        </div>
-        <div class="field"><label class="lbl">Clé API Resend</label>
-          <input id="resend-key" type="password" placeholder="re_xxxxxxxxxxxxxxxxxxxxxxx"/>
-        </div>
-        <div class="field" style="margin-top:12px"><label class="lbl">Expéditeur (From)</label>
-          <input id="resend-from" placeholder="Facturo &lt;onboarding@resend.dev&gt;"/>
-        </div>
-        <p style="font-size:11px;color:var(--slate-400);margin-top:8px">Sur le plan gratuit, utilisez <code style="background:var(--slate-100);padding:1px 4px;border-radius:3px">onboarding@resend.dev</code> comme expéditeur. Pour envoyer depuis votre propre email, vérifiez votre domaine sur resend.com.</p>
-      </div>
-        <div class="field" style="margin-top:12px"><label class="lbl">Token de sécurité (header x-api-token)</label><input id="tg-token" placeholder="montoken-secret-123"/></div>
-        <div style="margin-top:12px;padding:12px;background:var(--blue-50);border-radius:var(--r);border:1px solid var(--blue-200)">
-          <div style="font-size:12px;font-weight:600;color:var(--blue-700);margin-bottom:4px">Comment ça fonctionne</div>
-          <div style="font-size:12px;color:var(--blue-600);line-height:1.7">Vous envoyez un message à votre bot Telegram → Make reçoit le message → Make appelle cette app → la facture est créée → vous recevez une confirmation.</div>
-        </div>
+
       </div>
 
       <div class="form-section">
@@ -1254,20 +1247,18 @@ function renderTelegram(){
   const c=getConfig();
   document.getElementById('tg-webhook').value=c.webhook||'';
   document.getElementById('tg-token').value=c.token||'';
-  document.getElementById('resend-key').value=c.resendKey?'••••••••••••••••••••':'';
-  document.getElementById('resend-from').value=c.resendFrom||'Facturo <onboarding@resend.dev>';
+
   document.getElementById('gh-token').value=c.ghToken?'••••••••••••••••••••':'';
+  document.getElementById('claude-key').value=c.claudeKey?'••••••••••••••••••••':'';
 }
 function saveConfig(){
   const c=getConfig();
-  const newResend=document.getElementById('resend-key').value;
-  const newGh=document.getElementById('gh-token').value;
+    const newGh=document.getElementById('gh-token').value;
   S.set('config',{
     webhook:document.getElementById('tg-webhook').value,
     token:document.getElementById('tg-token').value,
-    resendKey: newResend.startsWith('•') ? c.resendKey : newResend,
-    resendFrom: document.getElementById('resend-from').value||'Facturo <onboarding@resend.dev>',
-    ghToken: newGh.startsWith('•') ? c.ghToken : newGh
+    ghToken: newGh.startsWith('•') ? c.ghToken : newGh,
+    claudeKey: (()=>{const v=document.getElementById('claude-key').value;return v.startsWith('•')?c.claudeKey:v;})()
   });
   toast('Configuration enregistrée','success');
 }
@@ -2002,10 +1993,18 @@ Quand il veut ajouter un client:
 Quand il veut des infos, réponds en français de façon concise et directe.
 Ne réponds JAMAIS avec du markdown ou des balises. Texte simple uniquement.`;
 
+  const cfg=getConfig();
+  const claudeKey=cfg.claudeKey||'';
+  if(!claudeKey){
+    resEl.style.display='block';
+    resEl.style.background='#fef9c3';resEl.style.borderColor='#fbbf24';
+    resEl.innerHTML='⚠️ Configurez votre clé API Claude dans <strong>Assistant & Config</strong> → Clé API Anthropic';
+    return;
+  }
   try{
     const resp=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-allow-browser':'true'},
       body:JSON.stringify({
         model:'claude-sonnet-4-20250514',
         max_tokens:1000,
