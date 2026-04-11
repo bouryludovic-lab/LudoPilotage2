@@ -2055,9 +2055,23 @@ RÈGLES:
     const data=await resp.json();
     let action=null;
     try{
-      const raw=data.action?data:JSON.parse(data.text||data.response||data.message||'{}');
-      action=raw;
-    }catch(e){action={action:'info',message:data.text||data.response||JSON.stringify(data)};}
+      // Nettoyer la réponse : enlever les backticks markdown si présents
+      let raw=data;
+      if(typeof data === 'string'){
+        raw = data.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+        action = JSON.parse(raw);
+      } else if(data.action){
+        action = data;
+      } else {
+        let txt = data.text||data.response||data.message||JSON.stringify(data);
+        txt = txt.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+        action = JSON.parse(txt);
+      }
+    }catch(e){
+      let txt = typeof data==='string'?data:(data.text||data.response||JSON.stringify(data));
+      txt = txt.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+      action={action:'info',message:txt};
+    }
     await executeAIAction(action,resEl);
   }catch(e){
     resEl.style.background='#fef2f2';resEl.style.borderColor='#fca5a5';
