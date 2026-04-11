@@ -103,15 +103,9 @@ const AT = {
 };
 </script>
 <script>
-// ── EMAILJS CONFIG ────────────────────────────────────────────────────────────
-const EJS = {
-  SERVICE:   'service_mhadvtg',
-  TEMPLATE:  'template_fxeym4w',
-  PUBLIC_KEY: 'ADfKL3lh716IDPkf_'
-};
+
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -1600,43 +1594,43 @@ async function sendInvoiceEmail(){
   const subject=document.getElementById('send-subject').value.trim();
   const body=document.getElementById('send-body').value.trim();
   if(!to){toast('Entrez une adresse email','error');return;}
+  const cfg=getConfig();
+  if(!cfg.webhook){toast("Configurez le webhook Make dans Telegram & Make","error");return;}
 
   const btn=document.querySelector('#modal-send .btn-primary');
   btn.textContent='Génération PDF...';btn.disabled=true;
 
   try{
-    // 1. Générer le PDF avec jsPDF
+    // 1. Générer le PDF avec jsPDF pur (vrai PDF propre)
     const pdfDataUri = await generatePdfBase64(currentFac);
+    const pdfBase64Clean = pdfDataUri.split(',')[1];
     const filename = 'facture-'+currentFac.num+'.pdf';
 
-    // 2. Envoyer via EmailJS avec le PDF en pièce jointe
+    // 2. Envoyer via webhook Make
     btn.textContent='Envoi en cours...';
-
-    emailjs.init(EJS.PUBLIC_KEY);
-
-    const templateParams = {
-      to_email: to,
-      subject: subject,
-      message: body,
-      from_name: getProfil().nom || 'Facturo',
+    const payload={
+      to, subject, body,
+      facture_num: currentFac.num,
+      facture_total: fmtMoney(currentFac.total),
+      client_nom: currentFac.clientNom,
+      pdf_base64: pdfBase64Clean,
+      pdf_filename: filename
     };
 
-    // Ajouter le PDF comme pièce jointe via le contenu base64
-    const result = await emailjs.send(EJS.SERVICE, EJS.TEMPLATE, templateParams);
+    const r=await fetch(cfg.webhook,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-token':cfg.token||''},
+      body:JSON.stringify(payload)
+    });
 
-    if(result.status === 200){
-      // Marquer email envoyé dans Airtable
-      if(currentFac.atId && AT.token()){
-        await AT.update(AT.TABLES.factures, currentFac.atId, {[AT.FIELDS.factures.emailEnvoye]: true});
+    if(r.ok){
+      if(currentFac.atId&&AT.token()){
+        await AT.update(AT.TABLES.factures,currentFac.atId,{[AT.FIELDS.factures.emailEnvoye]:true});
       }
-      // Télécharger aussi le PDF localement
-      const doc = await generatePdfDoc(currentFac);
-      doc.save(filename);
-
       closeModal('modal-send');
-      toast('Email envoyé à '+to+' ! PDF téléchargé également.','success');
-    } else {
-      toast('Erreur EmailJS : '+result.text,'error');
+      toast('Facture envoyée à '+to+' !','success');
+    }else{
+      toast("Erreur Make — vérifiez le webhook","error");
     }
   }catch(e){
     toast('Erreur : '+e.message,'error');
