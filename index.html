@@ -1356,7 +1356,7 @@ async function syncClients(){
 
 async function syncFactures(){
   const records=await AT.getAll(AT.TABLES.factures);
-  if(!records||!records.length) return;
+  if(!records||!records.length) return; // Ne pas écraser si Airtable vide
   const factures=records.map(r=>{
     const f=r.fields||{};
     const statut=f['Statut']||'';
@@ -1966,7 +1966,7 @@ async function generatePdfBase64(f){
 }
 
 
-// ── ASSISTANT IA (Claude API) ─────────────────────────────────────────────────
+// ── ASSISTANT IA AGENTIQUE ───────────────────────────────────────────────────
 function quickCmd(txt){
   document.getElementById('ai-input').value=txt;
   sendToAI();
@@ -1982,26 +1982,45 @@ async function sendToAI(){
   resEl.innerHTML='<span style="color:var(--slate-400)">⏳ Analyse en cours...</span>';
 
   const p=getProfil();
-  const clients=getClients().map(c=>c.nom).join(', ')||'aucun';
-  const factures=getFactures().slice(0,5).map(f=>f.num+' '+f.clientNom+' '+fmtMoney(f.total)+' '+f.statut).join('\n')||'aucune';
+  const clients=getClients().map(c=>({nom:c.nom,email:c.email,id:c.id}));
+  const factures=getFactures().slice(0,10).map(f=>({num:f.num,client:f.clientNom,montant:f.total,statut:f.statut,email:f.clientEmail,atId:f.atId}));
   const caTotal=getFactures().filter(f=>f.statut==='paid').reduce((s,f)=>s+Number(f.total),0);
   const caMois=getFactures().filter(f=>{const d=new Date(f.date);const n=new Date();return d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear()}).reduce((s,f)=>s+Number(f.total),0);
+  const caAttente=getFactures().filter(f=>f.statut==='pending').reduce((s,f)=>s+Number(f.total),0);
 
-  const systemPrompt=`Tu es l'assistant de ${p.nom||'l\'utilisateur'}, auto-entrepreneur (SIRET: ${p.siret||'N/A'}).
-Tu as accès à ces données en temps réel :
-- Clients enregistrés : ${clients}
-- 5 dernières factures : ${factures}
-- CA total toutes factures payées : ${fmtMoney(caTotal)}
-- CA du mois en cours : ${fmtMoney(caMois)}
+  const systemPrompt=`Tu es l'assistant IA de ${p.nom||'votre utilisateur'}, auto-entrepreneur.
 
-Quand l'utilisateur veut créer une facture, réponds UNIQUEMENT avec un JSON:
-{"action":"create_facture","client":"NomClient","montant":500,"desc":"description"}
+DONNÉES ACTUELLES:
+- Clients: ${JSON.stringify(clients)}
+- 10 dernières factures: ${JSON.stringify(factures)}
+- CA payé total: ${fmtMoney(caTotal)}
+- CA mois en cours: ${fmtMoney(caMois)}
+- CA en attente: ${fmtMoney(caAttente)}
 
-Quand il veut ajouter un client:
-{"action":"create_client","nom":"Nom","email":"email@mail.fr","adresse":"adresse"}
+Tu analyses la demande et réponds UNIQUEMENT avec un JSON valide (sans markdown, sans texte avant ou après).
 
-Quand il veut des infos, réponds en français de façon concise et directe.
-Ne réponds JAMAIS avec du markdown ou des balises. Texte simple uniquement.`;
+ACTIONS DISPONIBLES:
+
+1. Créer une facture:
+{"action":"create_facture","client":"NomExact","montant":500,"desc":"description prestation"}
+
+2. Ajouter un client:
+{"action":"create_client","nom":"Nom","email":"email@mail.fr","tel":"0600000000","adresse":"adresse"}
+
+3. Envoyer une facture par email:
+{"action":"send_email","facture_num":"2026-32040","to":"email@client.fr","subject":"Facture N° 2026-32040","body":"Bonjour, veuillez trouver..."}
+
+4. Marquer une facture comme payée:
+{"action":"mark_paid","facture_num":"2026-32040"}
+
+5. Informations / réponse texte:
+{"action":"info","message":"Votre CA du mois est de 1250€. Vous avez 2 factures en attente pour 600€."}
+
+RÈGLES:
+- Pour create_facture, utilise le nom exact du client tel qu\'il apparaît dans la liste
+- Pour send_email, utilise l\'email du client depuis la liste des factures
+- Si une info est manquante, demande-la via action info
+- Réponds TOUJOURS avec un JSON valide, jamais de texte brut`;
 
   const cfg=getConfig();
   const claudeKey=cfg.claudeKey||'';
@@ -2012,66 +2031,102 @@ Ne réponds JAMAIS avec du markdown ou des balises. Texte simple uniquement.`;
     return;
   }
 
+  const cfg2=getConfig();
+  if(!cfg2.webhook){
+    resEl.style.display='block';
+    resEl.style.background='#fef9c3';resEl.style.borderColor='#fbbf24';
+    resEl.innerHTML='⚠️ Configurez le webhook Make dans <strong>Assistant & Config</strong> pour activer l\'IA.';
+    return;
+  }
+
   try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+    // Passer par Make comme proxy pour éviter les restrictions CORS
+    const resp=await fetch(cfg2.webhook,{
       method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'x-api-key':claudeKey,
-        'anthropic-version':'2023-06-01',
-        'anthropic-dangerous-allow-browser':'true'
-      },
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        model:'claude-haiku-4-5-20251001',
-        max_tokens:500,
-        system: systemPrompt,
-        messages:[{role:'user',content:input}]
+        type:'ai_query',
+        query:input,
+        system:systemPrompt,
+        claude_key:claudeKey
       })
     });
-    if(!resp.ok){
-      const err=await resp.json();
-      throw new Error(err.error?.message||'Erreur API '+resp.status);
-    }
+    if(!resp.ok) throw new Error('Webhook Make erreur '+resp.status);
     const data=await resp.json();
-    const text=(data.content&&data.content[0]&&data.content[0].text)||'Pas de réponse';
-
-    // Essayer de parser comme action JSON
+    let action=null;
     try{
-      const action=JSON.parse(text);
-      if(action.action==='create_facture'){
-        const c=getClients().find(x=>x.nom.toLowerCase().includes(action.client.toLowerCase()));
-        if(c){
-          go('nouvelle');
-          setTimeout(()=>{
-            document.getElementById('fn-client').value=c.id;
-            fillClient();
-            if(document.getElementById('lignes-wrap').children.length===0) addLine();
-            const firstDesc=document.querySelector('.ln-desc');
-            const firstPu=document.querySelector('.ln-pu');
-            if(firstDesc) firstDesc.value=action.desc||'';
-            if(firstPu){firstPu.value=action.montant;firstPu.dispatchEvent(new Event('input'));}
-            calcTotal();
-          },300);
-          resEl.style.background='#f0fdf4';resEl.style.borderColor='#86efac';
-          resEl.innerHTML='✅ Formulaire rempli pour '+c.nom+' — '+fmtMoney(action.montant)+'. Vérifiez et enregistrez !';
-        }else{
-          resEl.style.background='#fef9c3';resEl.style.borderColor='#fbbf24';
-          resEl.innerHTML='⚠️ Client "'+action.client+'" introuvable. Clients disponibles : '+clients;
-        }
-      }else if(action.action==='create_client'){
-        await createClientFromBot({nom:action.nom,email:action.email||'',adresse:action.adresse||''});
-        renderDash();
-        resEl.style.background='#f0fdf4';resEl.style.borderColor='#86efac';
-        resEl.innerHTML='✅ Client créé : '+action.nom;
-      }
-    }catch(e){
-      // Réponse texte normale
-      resEl.style.background='white';resEl.style.borderColor='var(--blue-200)';
-      resEl.innerHTML=text.replace(/\n/g,'<br>');
-    }
+      const raw=data.action?data:JSON.parse(data.text||data.response||data.message||'{}');
+      action=raw;
+    }catch(e){action={action:'info',message:data.text||data.response||JSON.stringify(data)};}
+    await executeAIAction(action,resEl);
   }catch(e){
     resEl.style.background='#fef2f2';resEl.style.borderColor='#fca5a5';
     resEl.innerHTML='❌ Erreur : '+e.message;
+  }
+}
+
+async function executeAIAction(action,resEl){
+  switch(action.action){
+    case 'create_facture':{
+      const c=getClients().find(x=>x.nom.toLowerCase()===action.client.toLowerCase())||
+               getClients().find(x=>x.nom.toLowerCase().includes(action.client.toLowerCase()));
+      if(!c){
+        resEl.style.background='#fef9c3';resEl.style.borderColor='#fbbf24';
+        resEl.innerHTML='⚠️ Client "'+action.client+'" introuvable. Clients : '+getClients().map(x=>x.nom).join(', ');
+        return;
+      }
+      go('nouvelle');
+      await new Promise(r=>setTimeout(r,300));
+      document.getElementById('fn-client').value=c.id;
+      fillClient();
+      if(document.getElementById('lignes-wrap').children.length===0) addLine();
+      const firstDesc=document.querySelector('.ln-desc');
+      const firstPu=document.querySelector('.ln-pu');
+      if(firstDesc) firstDesc.value=action.desc||'';
+      if(firstPu){firstPu.value=action.montant;firstPu.dispatchEvent(new Event('input'));}
+      calcTotal();
+      resEl.style.background='#f0fdf4';resEl.style.borderColor='#86efac';
+      resEl.innerHTML='✅ Formulaire prêt — '+c.nom+' — '+fmtMoney(action.montant)+'<br><small>Vérifiez et cliquez "Enregistrer & aperçu PDF"</small>';
+      break;
+    }
+    case 'create_client':{
+      await createClientFromBot({nom:action.nom,email:action.email||'',adresse:action.adresse||'',tel:action.tel||''});
+      renderDash();
+      resEl.style.background='#f0fdf4';resEl.style.borderColor='#86efac';
+      resEl.innerHTML='✅ Client créé : <strong>'+action.nom+'</strong>'+(action.email?' — '+action.email:'');
+      break;
+    }
+    case 'send_email':{
+      const f=getFactures().find(x=>x.num===action.facture_num);
+      if(!f){resEl.innerHTML='⚠️ Facture '+action.facture_num+' introuvable';return;}
+      currentFac=f;
+      document.getElementById('pdf-wrap').innerHTML=buildPdf(f);
+      document.getElementById('send-to').value=action.to||f.clientEmail||'';
+      document.getElementById('send-subject').value=action.subject||'Facture N° '+f.num;
+      document.getElementById('send-body').value=action.body||'';
+      openModal('modal-send');
+      resEl.style.background='#f0fdf4';resEl.style.borderColor='#86efac';
+      resEl.innerHTML='✅ Modal envoi ouverte pour facture '+f.num+' — confirmez l\'envoi.';
+      break;
+    }
+    case 'mark_paid':{
+      const facs=getFactures();
+      const f=facs.find(x=>x.num===action.facture_num);
+      if(!f){resEl.innerHTML='⚠️ Facture '+action.facture_num+' introuvable';return;}
+      f.statut='paid';
+      S.set('factures',facs);
+      if(f.atId&&AT.token()) await AT.update(AT.TABLES.factures,f.atId,{[AT.FIELDS.factures.statut]:'Payée'});
+      renderFac();renderDash();
+      resEl.style.background='#f0fdf4';resEl.style.borderColor='#86efac';
+      resEl.innerHTML='✅ Facture '+f.num+' marquée payée !';
+      break;
+    }
+    case 'info':
+    default:{
+      resEl.style.background='white';resEl.style.borderColor='var(--blue-200)';
+      resEl.innerHTML=(action.message||JSON.stringify(action)).replace(/\n/g,'<br>');
+      break;
+    }
   }
 }
 
