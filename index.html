@@ -1382,6 +1382,16 @@ async function syncProfil(){
     adresse:f['Adresse']||p.adresse||'',email:f['Email']||p.email||'',
     tel:f['Téléphone']||p.tel||'',iban:f['IBAN']||p.iban||'',
     prefix:f['Préfixe numérotation']||p.prefix||'2025-'});
+  // Sync clés API depuis Airtable vers config locale
+  const cfg=getConfig();
+  if(f['Clé API Claude']&&!cfg.claudeKey) {
+    cfg.claudeKey=f['Clé API Claude'];
+    S.set('config',cfg);
+  }
+  if(f['Token GitHub']&&!cfg.ghToken) {
+    cfg.ghToken=f['Token GitHub'];
+    S.set('config',cfg);
+  }
 }
 
 async function saveAtToken(){
@@ -2001,17 +2011,27 @@ Ne réponds JAMAIS avec du markdown ou des balises. Texte simple uniquement.`;
     resEl.innerHTML='⚠️ Configurez votre clé API Claude dans <strong>Assistant & Config</strong> → Clé API Anthropic';
     return;
   }
+
   try{
     const resp=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-allow-browser':'true'},
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key':claudeKey,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-allow-browser':'true'
+      },
       body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:1000,
+        model:'claude-haiku-4-5-20251001',
+        max_tokens:500,
         system: systemPrompt,
         messages:[{role:'user',content:input}]
       })
     });
+    if(!resp.ok){
+      const err=await resp.json();
+      throw new Error(err.error?.message||'Erreur API '+resp.status);
+    }
     const data=await resp.json();
     const text=(data.content&&data.content[0]&&data.content[0].text)||'Pas de réponse';
 
