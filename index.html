@@ -102,7 +102,7 @@ const AT = {
   }
 };
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -1168,10 +1168,10 @@ function buildPdf(f){
   return h.join('');
 }
 
-function dlPDF(){
-  const el=document.getElementById('pdf-doc');
-  if(!el||!currentFac)return;
-  html2pdf().set({margin:0,filename:`facture-${currentFac.num}.pdf`,image:{type:'jpeg',quality:.98},html2canvas:{scale:2,useCORS:true},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(el).save();
+async function dlPDF(){
+  if(!currentFac)return;
+  const doc = await generatePdfDoc(currentFac);
+  doc.save('facture-'+currentFac.num+'.pdf');
 }
 
 // ── PROFIL ────────────────────────────────────────────────────────────────────
@@ -1598,49 +1598,24 @@ async function sendInvoiceEmail(){
   if(!cfg.webhook){toast("Aucun webhook Make configuré","error");return;}
   if(!currentFac?.atId){toast('Facture non synchronisée avec Airtable','error');return;}
 
-  const pdfEl=document.getElementById('pdf-doc');
-  if(!pdfEl){toast("Ouvrez d'abord l'aperçu de la facture",'error');return;}
-
   const btn=document.querySelector('#modal-send .btn-primary');
   btn.textContent='Génération PDF...';btn.disabled=true;
 
   try{
-    // 1. Générer le PDF en base64
-    const pdfDataUri=await html2pdf().set({
-      margin:0,image:{type:'jpeg',quality:.95},
-      html2canvas:{scale:2,useCORS:true},
-      jsPDF:{unit:'mm',format:'a4'}
-    }).from(pdfEl).outputPdf('datauristring');
-
-    // 2. Uploader le PDF dans Airtable (champ Attachments)
-    btn.textContent='Upload vers Airtable...';
+    // 1. Générer le PDF avec jsPDF pur
+    btn.textContent='Génération PDF...';
+    const pdfDataUri = await generatePdfBase64(currentFac);
+    const pdfBase64Clean = pdfDataUri.split(',')[1];
     const filename='facture-'+currentFac.num+'.pdf';
-    const uploadRes=await fetch(
-      `https://api.airtable.com/v0/${AT.BASE}/${AT.TABLES.factures}/${currentFac.atId}`,
-      {
-        method:'PATCH',
-        headers:AT.headers(),
-        body:JSON.stringify({fields:{
-          [AT.FIELDS.factures.pdf]:[{url:pdfDataUri,filename}]
-        }})
-      }
-    );
 
-    let pdfUrl=null;
-    if(uploadRes.ok){
-      const data=await uploadRes.json();
-      const attachments=data.fields?.[AT.FIELDS.factures.pdf]||[];
-      pdfUrl=attachments[0]?.url||null;
-    }
-
-    // 3. Envoyer le webhook Make avec l'URL Airtable
+    // 2. Envoyer via webhook Make avec le base64
     btn.textContent='Envoi en cours...';
     const payload={
       to, subject, body,
       facture_num: currentFac.num,
       facture_total: fmtMoney(currentFac.total),
       client_nom: currentFac.clientNom,
-      pdf_url: pdfUrl,
+      pdf_base64: pdfBase64Clean,
       pdf_filename: filename
     };
 
@@ -1664,6 +1639,197 @@ async function sendInvoiceEmail(){
   }finally{
     btn.textContent='Envoyer';btn.disabled=false;
   }
+}
+
+
+// ── GÉNÉRATION PDF AVEC jsPDF PUR ─────────────────────────────────────────────
+async function generatePdfDoc(f){
+  const { jsPDF } = window.jspdf;
+  const p = getProfil();
+  const doc = new jsPDF({unit:'mm', format:'a4', orientation:'portrait'});
+  const W = 210, H = 297;
+  const ml = 15, mr = 15, mt = 15;
+  let y = mt;
+
+  // Couleurs
+  const dark = [26, 26, 46];
+  const blue = [46, 125, 233];
+  const gray = [100, 116, 139];
+  const lgray = [241, 245, 249];
+
+  // --- Logo SVG TNS (texte) ---
+  doc.setFillColor(...dark);
+  doc.rect(ml, y, 22, 22, 'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(14); doc.setFont('helvetica','bold');
+  doc.text('TNS', ml+11, y+12, {align:'center'});
+  doc.setFillColor(...blue);
+  doc.circle(ml+11, y+18, 2, 'F');
+
+  doc.setDrawColor(...dark);
+  doc.setLineWidth(0.3);
+  doc.line(ml+26, y+2, ml+26, y+20);
+
+  doc.setTextColor(...dark);
+  doc.setFontSize(16); doc.setFont('helvetica','bold');
+  doc.text('THE NEXT STEP', ml+30, y+10);
+  doc.setDrawColor(...blue);
+  doc.setLineWidth(0.5);
+  doc.line(ml+30, y+13, W-mr, y+13);
+  doc.setFontSize(7); doc.setFont('helvetica','normal');
+  doc.setTextColor(...gray);
+  doc.text('CONSULTING & STRATEGY', ml+30, y+19);
+
+  // --- FACTURE titre ---
+  doc.setFontSize(22); doc.setFont('helvetica','bold');
+  doc.setTextColor(...dark);
+  doc.text('FACTURE', W-mr, y+8, {align:'right'});
+  doc.setFontSize(11); doc.setFont('helvetica','bold');
+  doc.setTextColor(...blue);
+  doc.text('N° '+f.num, W-mr, y+15, {align:'right'});
+  doc.setFontSize(8); doc.setFont('helvetica','normal');
+  doc.setTextColor(...gray);
+  doc.text('Émise le '+fmtDate(f.date), W-mr, y+21, {align:'right'});
+  doc.text('Échéance : '+(f.echeanceLabel||'À réception'), W-mr, y+26, {align:'right'});
+
+  y += 32;
+
+  // Séparateur bleu
+  doc.setDrawColor(...blue);
+  doc.setLineWidth(0.6);
+  doc.line(ml, y, W-mr, y);
+  y += 6;
+
+  // --- DE / FACTURÉ À ---
+  const colW = (W - ml - mr - 10) / 2;
+  doc.setFontSize(7); doc.setFont('helvetica','bold');
+  doc.setTextColor(...blue);
+  doc.text('DE', ml, y);
+  doc.text('FACTURÉ À', ml+colW+10, y);
+  y += 4;
+
+  doc.setFontSize(10); doc.setFont('helvetica','bold');
+  doc.setTextColor(...dark);
+  doc.text(p.nom||'—', ml, y);
+  doc.text(f.clientNom||'—', ml+colW+10, y);
+  y += 5;
+
+  doc.setFontSize(8); doc.setFont('helvetica','normal');
+  doc.setTextColor(...gray);
+  if(p.adresse){ doc.text(p.adresse, ml, y); }
+  if(f.clientAdresse){ doc.text(f.clientAdresse, ml+colW+10, y); }
+  y += 4;
+  if(p.email){
+    doc.text(p.email+(p.tel?' · '+p.tel:''), ml, y);
+  }
+  if(f.clientEmail){ doc.text(f.clientEmail, ml+colW+10, y); }
+  y += 4;
+  if(p.siret){ doc.setFontSize(7); doc.text('SIRET : '+p.siret, ml, y); }
+  if(f.clientSiret){ doc.setFontSize(7); doc.text('SIRET : '+f.clientSiret, ml+colW+10, y); }
+  y += 8;
+
+  // --- TABLEAU PRESTATIONS ---
+  const cols = [ml, ml+90, ml+130, ml+160];
+  const rowH = 8;
+
+  // En-tête
+  doc.setFillColor(...lgray);
+  doc.rect(ml, y, W-ml-mr, rowH, 'F');
+  doc.setDrawColor(...dark);
+  doc.setLineWidth(0.4);
+  doc.line(ml, y+rowH, W-mr, y+rowH);
+
+  doc.setFontSize(7); doc.setFont('helvetica','bold');
+  doc.setTextColor(...dark);
+  doc.text('PRESTATION', cols[0]+2, y+5);
+  doc.text('QTÉ', cols[1]+2, y+5);
+  doc.text('P.U. HT', cols[2]+2, y+5);
+  doc.text('TOTAL HT', cols[3]+2, y+5);
+  y += rowH;
+
+  // Lignes
+  doc.setFont('helvetica','normal');
+  (f.lignes||[]).forEach((l,i)=>{
+    if(i%2===1){ doc.setFillColor(248,250,252); doc.rect(ml,y,W-ml-mr,rowH,'F'); }
+    doc.setDrawColor(226,232,240); doc.setLineWidth(0.2);
+    doc.line(ml, y+rowH, W-mr, y+rowH);
+
+    doc.setFontSize(8); doc.setTextColor(...dark);
+    doc.text(String(l.desc||'').substring(0,55), cols[0]+2, y+5);
+    doc.text(String(l.qte), cols[1]+2, y+5);
+    doc.text(fmtMoney(l.pu), cols[2]+2, y+5);
+    doc.setFont('helvetica','bold');
+    doc.text(fmtMoney(l.qte*l.pu), cols[3]+2, y+5);
+    doc.setFont('helvetica','normal');
+    y += rowH;
+  });
+  y += 6;
+
+  // --- TOTAUX ---
+  const totX = ml+100;
+  const totW = W-mr-totX;
+  doc.setFontSize(8); doc.setFont('helvetica','normal');
+  doc.setTextColor(...gray);
+  doc.text('Sous-total HT', totX, y);
+  doc.setTextColor(...dark); doc.setFont('helvetica','bold');
+  doc.text(fmtMoney(f.total), W-mr, y, {align:'right'});
+  y += 5;
+
+  doc.setFont('helvetica','normal'); doc.setTextColor(...gray);
+  doc.setFontSize(7);
+  doc.text('TVA', totX, y);
+  doc.text('Non applicable — art. 293 B CGI', W-mr, y, {align:'right'});
+  y += 3;
+
+  // Bloc total
+  doc.setFillColor(...dark);
+  doc.roundedRect(totX, y, totW, 10, 2, 2, 'F');
+  doc.setFontSize(10); doc.setFont('helvetica','bold');
+  doc.setTextColor(255,255,255);
+  doc.text('Total à payer', totX+4, y+6.5);
+  doc.setTextColor(...blue);
+  doc.text(fmtMoney(f.total), W-mr-2, y+6.5, {align:'right'});
+  y += 16;
+
+  // Notes si présentes
+  if(f.notes){
+    doc.setFillColor(248,250,252);
+    doc.rect(ml, y, W-ml-mr, 12, 'F');
+    doc.setFontSize(7); doc.setFont('helvetica','normal');
+    doc.setTextColor(...gray);
+    doc.text(f.notes.substring(0,120), ml+2, y+5, {maxWidth: W-ml-mr-4});
+    y += 14;
+  }
+
+  // --- BANK DETAILS ---
+  doc.setDrawColor(...dark);
+  doc.setLineWidth(0.5);
+  doc.line(ml, y, W-mr, y);
+  y += 5;
+
+  doc.setFontSize(7); doc.setFont('helvetica','bold');
+  doc.setTextColor(...dark);
+  doc.text('BANK DETAILS', ml, y);
+  y += 4;
+
+  doc.setFont('helvetica','normal'); doc.setTextColor(...gray); doc.setFontSize(7);
+  doc.text("Caisse d'Epargne Bretagne-Pays de Loire", ml, y); y+=3.5;
+  doc.text('Titulaire du compte : Boury Ludovic', ml, y); y+=3.5;
+  doc.text('BIC : CEPAFRPP444  |  IBAN : FR76 1444 5202 0008 0052 6540 950', ml, y); y+=3.5;
+  doc.text('Banque : 14445  |  Guichet : 20200  |  Compte : 08005265409  |  Clé RIB : 50', ml, y); y+=5;
+  doc.setFont('helvetica','bold'); doc.setTextColor(...dark);
+  doc.text('Paiement à réception', ml, y); y+=5;
+
+  doc.setFontSize(6); doc.setFont('helvetica','normal');
+  doc.setTextColor(200,200,200);
+  doc.text('TVA non applicable, article 293 B du Code Général des Impôts — Micro-entrepreneur', ml, y);
+
+  return doc;
+}
+
+async function generatePdfBase64(f){
+  const doc = await generatePdfDoc(f);
+  return doc.output('datauristring');
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
