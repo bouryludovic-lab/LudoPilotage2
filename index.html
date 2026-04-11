@@ -412,7 +412,7 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
       <div class="nav-dot"></div> Connexion Airtable
     </div>
     <div class="nav-item" onclick="go('telegram')">
-      <div class="nav-dot"></div> Telegram & Make
+      <div class="nav-dot"></div> Assistant & Config
     </div>
   </nav>
 
@@ -665,6 +665,30 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
 
     <!-- TELEGRAM -->
     <div id="screen-telegram" class="screen">
+
+      <!-- SECTION ASSISTANT IA -->
+      <div class="form-section" style="border-color:var(--blue-300);background:linear-gradient(135deg,#eff6ff,#f8faff)">
+        <div class="form-section-title" style="color:var(--blue-700)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+          Assistant IA
+        </div>
+        <p style="font-size:12px;color:var(--slate-500);margin-bottom:14px">Tapez en langage naturel — l'IA comprend et exécute.</p>
+        <div style="display:flex;gap:8px;align-items:flex-end">
+          <div class="field" style="flex:1;margin:0">
+            <textarea id="ai-input" placeholder="Ex: Crée une facture pour Alegria de 500€ pour du conseil SEO&#10;Ex: Montre mon CA du mois&#10;Ex: Ajoute un client : Dupont, dupont@mail.fr" style="min-height:70px;font-size:13px"></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="sendToAI()" style="height:70px;padding:0 18px;flex-shrink:0">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
+          </button>
+        </div>
+        <div id="ai-result" style="display:none;margin-top:12px;padding:12px;border-radius:var(--r);font-size:13px;line-height:1.6;border:1px solid var(--blue-200);background:white"></div>
+        <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="quickCmd('Montre mes 5 dernières factures')">📋 Factures récentes</button>
+          <button class="btn btn-ghost btn-sm" onclick="quickCmd('Quel est mon CA ce mois ?')">📊 CA du mois</button>
+          <button class="btn btn-ghost btn-sm" onclick="quickCmd('Liste mes clients')">👥 Clients</button>
+        </div>
+      </div>
+
       <div class="form-section">
         <div class="form-section-title">Configuration Make</div>
         <div class="field"><label class="lbl">URL Webhook Make</label><input id="tg-webhook" placeholder="https://hook.eu2.make.com/xxxxx"/></div>
@@ -884,7 +908,7 @@ function toast(msg,type=''){
 }
 
 // ── NAVIGATION ───────────────────────────────────────────────────────────────
-const titles={dashboard:'Tableau de bord',factures:'Factures',clients:'Clients',nouvelle:'Nouvelle facture',profil:'Mon profil',telegram:'Telegram & Make'};
+const titles={dashboard:'Tableau de bord',factures:'Factures',clients:'Clients',nouvelle:'Nouvelle facture',profil:'Mon profil',telegram:'Assistant & Config'};
 
 function go(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
@@ -1937,6 +1961,98 @@ async function generatePdfBase64(f){
     return dataUri;
   } finally {
     if(tmp) document.body.removeChild(tmp);
+  }
+}
+
+
+// ── ASSISTANT IA (Claude API) ─────────────────────────────────────────────────
+function quickCmd(txt){
+  document.getElementById('ai-input').value=txt;
+  sendToAI();
+}
+
+async function sendToAI(){
+  const input=document.getElementById('ai-input').value.trim();
+  if(!input) return;
+  const resEl=document.getElementById('ai-result');
+  resEl.style.display='block';
+  resEl.style.background='#f8fafc';
+  resEl.style.borderColor='var(--blue-200)';
+  resEl.innerHTML='<span style="color:var(--slate-400)">⏳ Analyse en cours...</span>';
+
+  const p=getProfil();
+  const clients=getClients().map(c=>c.nom).join(', ')||'aucun';
+  const factures=getFactures().slice(0,5).map(f=>f.num+' '+f.clientNom+' '+fmtMoney(f.total)+' '+f.statut).join('\n')||'aucune';
+  const caTotal=getFactures().filter(f=>f.statut==='paid').reduce((s,f)=>s+Number(f.total),0);
+  const caMois=getFactures().filter(f=>{const d=new Date(f.date);const n=new Date();return d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear()}).reduce((s,f)=>s+Number(f.total),0);
+
+  const systemPrompt=`Tu es l'assistant de ${p.nom||'l\'utilisateur'}, auto-entrepreneur (SIRET: ${p.siret||'N/A'}).
+Tu as accès à ces données en temps réel :
+- Clients enregistrés : ${clients}
+- 5 dernières factures : ${factures}
+- CA total toutes factures payées : ${fmtMoney(caTotal)}
+- CA du mois en cours : ${fmtMoney(caMois)}
+
+Quand l'utilisateur veut créer une facture, réponds UNIQUEMENT avec un JSON:
+{"action":"create_facture","client":"NomClient","montant":500,"desc":"description"}
+
+Quand il veut ajouter un client:
+{"action":"create_client","nom":"Nom","email":"email@mail.fr","adresse":"adresse"}
+
+Quand il veut des infos, réponds en français de façon concise et directe.
+Ne réponds JAMAIS avec du markdown ou des balises. Texte simple uniquement.`;
+
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        system: systemPrompt,
+        messages:[{role:'user',content:input}]
+      })
+    });
+    const data=await resp.json();
+    const text=(data.content&&data.content[0]&&data.content[0].text)||'Pas de réponse';
+
+    // Essayer de parser comme action JSON
+    try{
+      const action=JSON.parse(text);
+      if(action.action==='create_facture'){
+        const c=getClients().find(x=>x.nom.toLowerCase().includes(action.client.toLowerCase()));
+        if(c){
+          go('nouvelle');
+          setTimeout(()=>{
+            document.getElementById('fn-client').value=c.id;
+            fillClient();
+            if(document.getElementById('lignes-wrap').children.length===0) addLine();
+            const firstDesc=document.querySelector('.ln-desc');
+            const firstPu=document.querySelector('.ln-pu');
+            if(firstDesc) firstDesc.value=action.desc||'';
+            if(firstPu){firstPu.value=action.montant;firstPu.dispatchEvent(new Event('input'));}
+            calcTotal();
+          },300);
+          resEl.style.background='#f0fdf4';resEl.style.borderColor='#86efac';
+          resEl.innerHTML='✅ Formulaire rempli pour '+c.nom+' — '+fmtMoney(action.montant)+'. Vérifiez et enregistrez !';
+        }else{
+          resEl.style.background='#fef9c3';resEl.style.borderColor='#fbbf24';
+          resEl.innerHTML='⚠️ Client "'+action.client+'" introuvable. Clients disponibles : '+clients;
+        }
+      }else if(action.action==='create_client'){
+        await createClientFromBot({nom:action.nom,email:action.email||'',adresse:action.adresse||''});
+        renderDash();
+        resEl.style.background='#f0fdf4';resEl.style.borderColor='#86efac';
+        resEl.innerHTML='✅ Client créé : '+action.nom;
+      }
+    }catch(e){
+      // Réponse texte normale
+      resEl.style.background='white';resEl.style.borderColor='var(--blue-200)';
+      resEl.innerHTML=text.replace(/\n/g,'<br>');
+    }
+  }catch(e){
+    resEl.style.background='#fef2f2';resEl.style.borderColor='#fca5a5';
+    resEl.innerHTML='❌ Erreur : '+e.message;
   }
 }
 
