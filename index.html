@@ -107,6 +107,7 @@ const AT = {
 
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -1198,9 +1199,15 @@ function buildPdf(f){
 }
 
 async function dlPDF(){
-  if(!currentFac)return;
-  const doc = await generatePdfDoc(currentFac);
-  doc.save('facture-'+currentFac.num+'.pdf');
+  const el=document.getElementById('pdf-doc');
+  if(!el||!currentFac)return;
+  html2pdf().set({
+    margin:0,
+    filename:'facture-'+currentFac.num+'.pdf',
+    image:{type:'jpeg',quality:.98},
+    html2canvas:{scale:2,useCORS:true},
+    jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+  }).from(el).save();
 }
 
 // ── PROFIL ────────────────────────────────────────────────────────────────────
@@ -1727,136 +1734,133 @@ async function generatePdfDoc(f){
   const { jsPDF } = window.jspdf;
   const p = getProfil();
   const doc = new jsPDF({unit:'mm', format:'a4', orientation:'portrait'});
-  const W = 210, H = 297;
+  const W = 210;
   const ml = 15, mr = 15, mt = 15;
+  const PW = W - ml - mr; // largeur utile = 180mm
   let y = mt;
 
   // Couleurs
   const dark = [26, 26, 46];
   const blue = [46, 125, 233];
   const gray = [100, 116, 139];
-  const lgray = [241, 245, 249];
+  const lgray = [232, 236, 240];
 
-  // --- Logo SVG TNS (texte) ---
+  // ── HEADER : Logo TNS ──
+  // Carré TNS
   doc.setFillColor(...dark);
-  doc.rect(ml, y, 22, 22, 'F');
+  doc.rect(ml, y, 20, 20, 'F');
   doc.setTextColor(255,255,255);
-  doc.setFontSize(14); doc.setFont('helvetica','bold');
-  doc.text('TNS', ml+11, y+12, {align:'center'});
-  doc.setFillColor(...blue);
-  doc.circle(ml+11, y+18, 2, 'F');
-
-  doc.setDrawColor(...dark);
-  doc.setLineWidth(0.3);
-  doc.line(ml+26, y+2, ml+26, y+20);
-
-  doc.setTextColor(...dark);
-  doc.setFontSize(16); doc.setFont('helvetica','bold');
-  doc.text('THE NEXT STEP', ml+30, y+10);
-  doc.setDrawColor(...blue);
-  doc.setLineWidth(0.5);
-  doc.line(ml+30, y+13, W-mr, y+13);
-  doc.setFontSize(7); doc.setFont('helvetica','normal');
-  doc.setTextColor(...gray);
-  doc.text('CONSULTING & STRATEGY', ml+30, y+19);
-
-  // --- FACTURE titre ---
-  doc.setFontSize(22); doc.setFont('helvetica','bold');
-  doc.setTextColor(...dark);
-  doc.text('FACTURE', W-mr, y+8, {align:'right'});
   doc.setFontSize(11); doc.setFont('helvetica','bold');
-  doc.setTextColor(...blue);
-  doc.text('N° '+f.num, W-mr, y+15, {align:'right'});
-  doc.setFontSize(8); doc.setFont('helvetica','normal');
-  doc.setTextColor(...gray);
-  doc.text('Émise le '+fmtDate(f.date), W-mr, y+21, {align:'right'});
-  doc.text('Échéance : '+(f.echeanceLabel||'À réception'), W-mr, y+26, {align:'right'});
-
-  y += 32;
-
-  // Séparateur bleu
-  doc.setDrawColor(...blue);
-  doc.setLineWidth(0.6);
-  doc.line(ml, y, W-mr, y);
-  y += 6;
-
-  // --- DE / FACTURÉ À ---
-  const colW = (W - ml - mr - 10) / 2;
-  doc.setFontSize(7); doc.setFont('helvetica','bold');
-  doc.setTextColor(...blue);
-  doc.text('DE', ml, y);
-  doc.text('FACTURÉ À', ml+colW+10, y);
-  y += 4;
-
-  doc.setFontSize(10); doc.setFont('helvetica','bold');
+  doc.text('TNS', ml+10, y+10, {align:'center'});
+  doc.setFillColor(...blue);
+  doc.circle(ml+10, y+16, 1.8, 'F');
+  // Séparateur vertical
+  doc.setDrawColor(200,200,200); doc.setLineWidth(0.3);
+  doc.line(ml+24, y+2, ml+24, y+18);
+  // Texte THE NEXT STEP
   doc.setTextColor(...dark);
-  doc.text(p.nom||'—', ml, y);
-  doc.text(f.clientNom||'—', ml+colW+10, y);
-  y += 5;
-
-  doc.setFontSize(8); doc.setFont('helvetica','normal');
+  doc.setFontSize(13); doc.setFont('helvetica','bold');
+  doc.text('THE NEXT STEP', ml+28, y+9);
+  doc.setDrawColor(180,190,200); doc.setLineWidth(0.3);
+  doc.line(ml+28, y+11, ml+28+62, y+11);
+  doc.setFontSize(6.5); doc.setFont('helvetica','normal');
   doc.setTextColor(...gray);
-  if(p.adresse){ doc.text(p.adresse, ml, y); }
-  if(f.clientAdresse){ doc.text(f.clientAdresse, ml+colW+10, y); }
-  y += 4;
-  if(p.email){
-    doc.text(p.email+(p.tel?' · '+p.tel:''), ml, y);
-  }
-  if(f.clientEmail){ doc.text(f.clientEmail, ml+colW+10, y); }
-  y += 4;
-  if(p.siret){ doc.setFontSize(7); doc.text('SIRET : '+p.siret, ml, y); }
-  if(f.clientSiret){ doc.setFontSize(7); doc.text('SIRET : '+f.clientSiret, ml+colW+10, y); }
-  y += 8;
+  doc.text('CONSULTING & STRATEGY', ml+28, y+16);
 
-  // --- TABLEAU PRESTATIONS ---
-  const cols = [ml, ml+90, ml+130, ml+160];
-  const rowH = 8;
+  // ── HEADER : FACTURE (droite) ──
+  doc.setFontSize(18); doc.setFont('helvetica','bold');
+  doc.setTextColor(...dark);
+  doc.text('FACTURE', W-mr, y+7, {align:'right'});
+  doc.setFontSize(10); doc.setFont('helvetica','bold');
+  doc.setTextColor(...blue);
+  doc.text('N° '+f.num, W-mr, y+13, {align:'right'});
+  doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+  doc.setTextColor(...gray);
+  doc.text('Émise le '+fmtDate(f.date), W-mr, y+19, {align:'right'});
+  doc.text('Échéance : '+(f.echeanceLabel||'À réception'), W-mr, y+24, {align:'right'});
 
-  // En-tête
+  y += 28;
+
+  // Séparateur gris fin
+  doc.setDrawColor(210,215,220); doc.setLineWidth(0.3);
+  doc.line(ml, y, W-mr, y);
+  y += 7;
+
+  // ── DE / FACTURÉ À ──
+  const col2 = ml + PW/2 + 5;
+  doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(...blue);
+  doc.text('DE', ml, y);
+  doc.text('FACTURÉ À', col2, y);
+  y += 4;
+
+  doc.setFontSize(9.5); doc.setFont('helvetica','bold'); doc.setTextColor(...dark);
+  doc.text(p.nom||'—', ml, y);
+  doc.text(f.clientNom||'—', col2, y);
+  y += 4.5;
+
+  doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(...gray);
+  if(p.adresse) doc.text(p.adresse.substring(0,40), ml, y);
+  if(f.clientAdresse) doc.text(String(f.clientAdresse).substring(0,40), col2, y);
+  y += 4;
+  const fromLine = (p.email||'')+(p.tel?' · '+p.tel:'');
+  if(fromLine) doc.text(fromLine.substring(0,40), ml, y);
+  if(f.clientEmail) doc.text(f.clientEmail.substring(0,40), col2, y);
+  y += 4;
+  doc.setFontSize(7);
+  if(p.siret) doc.text('SIRET : '+p.siret, ml, y);
+  if(f.clientSiret) doc.text('SIRET : '+f.clientSiret, col2, y);
+  y += 9;
+
+  // ── TABLEAU ──
+  // Colonnes : Prestation 95mm | Qté 18mm | P.U. HT 32mm | Total HT 35mm
+  const cDesc = ml;
+  const cQte  = ml + 95;
+  const cPU   = ml + 95 + 18;
+  const cTot  = ml + 95 + 18 + 32;
+  const rowH = 7.5;
+
+  // En-tête tableau
   doc.setFillColor(...lgray);
-  doc.rect(ml, y, W-ml-mr, rowH, 'F');
-  doc.setDrawColor(...dark);
-  doc.setLineWidth(0.4);
+  doc.rect(ml, y, PW, rowH, 'F');
+  doc.setDrawColor(...dark); doc.setLineWidth(0.3);
+  doc.line(ml, y, W-mr, y);
   doc.line(ml, y+rowH, W-mr, y+rowH);
 
-  doc.setFontSize(7); doc.setFont('helvetica','bold');
-  doc.setTextColor(...dark);
-  doc.text('PRESTATION', cols[0]+2, y+5);
-  doc.text('QTÉ', cols[1]+2, y+5);
-  doc.text('P.U. HT', cols[2]+2, y+5);
-  doc.text('TOTAL HT', cols[3]+2, y+5);
+  doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(...dark);
+  doc.text('PRESTATION', cDesc+2, y+5);
+  doc.text('QTÉ', cQte+2, y+5);
+  doc.text('P.U. HT', cPU+2, y+5);
+  doc.text('TOTAL HT', W-mr-2, y+5, {align:'right'});
   y += rowH;
 
-  // Lignes
+  // Lignes prestations
   doc.setFont('helvetica','normal');
-  (f.lignes||[]).forEach((l,i)=>{
-    if(i%2===1){ doc.setFillColor(248,250,252); doc.rect(ml,y,W-ml-mr,rowH,'F'); }
-    doc.setDrawColor(226,232,240); doc.setLineWidth(0.2);
+  (f.lignes||[]).forEach((l, i)=>{
+    if(i%2===1){ doc.setFillColor(248,250,252); doc.rect(ml,y,PW,rowH,'F'); }
+    doc.setDrawColor(220,225,230); doc.setLineWidth(0.15);
     doc.line(ml, y+rowH, W-mr, y+rowH);
-
     doc.setFontSize(8); doc.setTextColor(...dark);
-    doc.text(String(l.desc||'').substring(0,55), cols[0]+2, y+5);
-    doc.text(String(l.qte), cols[1]+2, y+5);
-    doc.text(fmtMoney(l.pu), cols[2]+2, y+5);
+    // Description tronquée à 50 chars
+    const desc = String(l.desc||'').substring(0,50);
+    doc.text(desc, cDesc+2, y+5);
+    doc.text(String(l.qte), cQte+2, y+5);
+    doc.text(fmtMoney(l.pu), cPU+2, y+5);
     doc.setFont('helvetica','bold');
-    doc.text(fmtMoney(l.qte*l.pu), cols[3]+2, y+5);
+    doc.text(fmtMoney(l.qte*l.pu), W-mr-2, y+5, {align:'right'});
     doc.setFont('helvetica','normal');
     y += rowH;
   });
-  y += 6;
+  y += 5;
 
-  // --- TOTAUX ---
-  const totX = ml+100;
-  const totW = W-mr-totX;
-  doc.setFontSize(8); doc.setFont('helvetica','normal');
-  doc.setTextColor(...gray);
+  // ── TOTAUX ──
+  const totX = ml + 100;
+  doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(...gray);
   doc.text('Sous-total HT', totX, y);
   doc.setTextColor(...dark); doc.setFont('helvetica','bold');
   doc.text(fmtMoney(f.total), W-mr, y, {align:'right'});
-  y += 5;
+  y += 4.5;
 
-  doc.setFont('helvetica','normal'); doc.setTextColor(...gray);
-  doc.setFontSize(7);
+  doc.setFont('helvetica','normal'); doc.setTextColor(...gray); doc.setFontSize(7);
   doc.text('TVA', totX, y);
   doc.text('Non applicable — art. 293 B CGI', W-mr, y, {align:'right'});
   y += 3;
@@ -1908,8 +1912,23 @@ async function generatePdfDoc(f){
 }
 
 async function generatePdfBase64(f){
-  const doc = await generatePdfDoc(f);
-  return doc.output('datauristring');
+  // Créer un div temporaire hors écran avec le HTML de la facture
+  const tmp = document.createElement('div');
+  tmp.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:white';
+  tmp.innerHTML = buildPdf(f);
+  document.body.appendChild(tmp);
+  try {
+    const dataUri = await html2pdf().set({
+      margin: 0,
+      filename: 'facture-'+f.num+'.pdf',
+      image: {type:'jpeg', quality:0.98},
+      html2canvas: {scale:2, useCORS:true, logging:false},
+      jsPDF: {unit:'mm', format:'a4', orientation:'portrait'}
+    }).from(tmp).outputPdf('datauristring');
+    return dataUri;
+  } finally {
+    document.body.removeChild(tmp);
+  }
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
