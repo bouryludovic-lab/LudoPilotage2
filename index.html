@@ -28,6 +28,7 @@ const AT = {
       notes:     'fldJphY2HZEcLyU8U',
       emailEnvoye:'fldQQFX8GjgST3GoH',
       pdf:        'fld0STwue4xaMjOwX',
+      pdfUrl:     'fldWERkkMOXVg6efx',
     },
     clients: {
       nom:       'fldKAzAwGwPPtAmR0',
@@ -670,6 +671,17 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
       </div>
 
       <div class="form-section">
+        <div class="form-section-title">Stockage PDF — GitHub</div>
+        <div style="padding:12px;background:var(--blue-50);border:1px solid var(--blue-200);border-radius:var(--r);margin-bottom:14px;font-size:12px;color:var(--blue-700)">
+          Le PDF sera automatiquement uploadé sur GitHub Pages et un lien unique sera envoyé par email au client.
+        </div>
+        <div class="field"><label class="lbl">Token GitHub</label>
+          <input id="gh-token" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"/>
+        </div>
+        <p style="font-size:11px;color:var(--slate-400);margin-top:6px">Token avec permission <strong>Contents: Read &amp; Write</strong> sur le repo LudoPilotage2.</p>
+      </div>
+
+      <div class="form-section">
         <div class="form-section-title">Envoi d'emails — Resend</div>
         <div style="padding:12px;background:var(--blue-50);border:1px solid var(--blue-200);border-radius:var(--r);margin-bottom:14px;font-size:12px;color:var(--blue-700)">
           Resend envoie les factures par email avec le PDF en pièce jointe directement depuis votre navigateur. Créez un compte gratuit sur <strong>resend.com</strong> et collez votre clé API ici.
@@ -1214,15 +1226,18 @@ function renderTelegram(){
   document.getElementById('tg-token').value=c.token||'';
   document.getElementById('resend-key').value=c.resendKey?'••••••••••••••••••••':'';
   document.getElementById('resend-from').value=c.resendFrom||'Facturo <onboarding@resend.dev>';
+  document.getElementById('gh-token').value=c.ghToken?'••••••••••••••••••••':'';
 }
 function saveConfig(){
   const c=getConfig();
-  const newKey=document.getElementById('resend-key').value;
+  const newResend=document.getElementById('resend-key').value;
+  const newGh=document.getElementById('gh-token').value;
   S.set('config',{
     webhook:document.getElementById('tg-webhook').value,
     token:document.getElementById('tg-token').value,
-    resendKey: newKey.startsWith('•') ? c.resendKey : newKey,
-    resendFrom: document.getElementById('resend-from').value||'Facturo <onboarding@resend.dev>'
+    resendKey: newResend.startsWith('•') ? c.resendKey : newResend,
+    resendFrom: document.getElementById('resend-from').value||'Facturo <onboarding@resend.dev>',
+    ghToken: newGh.startsWith('•') ? c.ghToken : newGh
   });
   toast('Configuration enregistrée','success');
 }
@@ -1614,57 +1629,90 @@ function openSendModal(){
   openModal('modal-send');
 }
 
+async function uploadPdfToGithub(pdfBase64, filename){
+  const cfg=getConfig();
+  if(!cfg.ghToken) return null;
+  const owner='bouryludovic-lab';
+  const repo='LudoPilotage2';
+  const path='factures/'+filename;
+  const url=`https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+  // Vérifier si le fichier existe déjà
+  let sha=null;
+  try{
+    const check=await fetch(url,{headers:{'Authorization':'Bearer '+cfg.ghToken,'Accept':'application/vnd.github+json'}});
+    if(check.ok){const d=await check.json();sha=d.sha;}
+  }catch(e){}
+  // Uploader le fichier
+  const body={message:'Facture '+filename,content:pdfBase64};
+  if(sha) body.sha=sha;
+  const r=await fetch(url,{
+    method:'PUT',
+    headers:{'Authorization':'Bearer '+cfg.ghToken,'Accept':'application/vnd.github+json','Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+  if(r.ok){
+    return `https://${owner}.github.io/${repo}/factures/${filename}`;
+  }
+  const err=await r.json();
+  console.error('GitHub upload error:', err);
+  return null;
+}
+
 async function sendInvoiceEmail(){
   const to=document.getElementById('send-to').value.trim();
   const subject=document.getElementById('send-subject').value.trim();
   const body=document.getElementById('send-body').value.trim();
   if(!to){toast('Entrez une adresse email','error');return;}
+  const cfg=getConfig();
+  if(!cfg.ghToken){toast('Configurez votre token GitHub dans Telegram & Make','error');return;}
+  if(!cfg.webhook){toast('Configurez le webhook Make dans Telegram & Make','error');return;}
 
   const btn=document.querySelector('#modal-send .btn-primary');
   btn.textContent='Génération PDF...';btn.disabled=true;
 
   try{
-    // 1. Générer le PDF avec jsPDF
+    // 1. Générer le PDF
     const pdfDataUri = await generatePdfBase64(currentFac);
     const pdfBase64Clean = pdfDataUri.split(',')[1];
     const filename = 'facture-'+currentFac.num+'.pdf';
 
-    // 2. Envoyer via Resend API
-    btn.textContent='Envoi en cours...';
-    const cfg=getConfig();
-    const resendKey=cfg.resendKey||'';
-    const resendFrom=cfg.resendFrom||'Facturo <onboarding@resend.dev>';
-    if(!resendKey){toast('Configurez votre clé Resend dans Telegram & Make','error');btn.textContent='Envoyer';btn.disabled=false;return;}
+    // 2. Uploader sur GitHub
+    btn.textContent='Upload GitHub...';
+    const pdfUrl = await uploadPdfToGithub(pdfBase64Clean, filename);
+    if(!pdfUrl){toast('Erreur upload GitHub — vérifiez votre token','error');return;}
+
+    // 3. Sauvegarder l'URL dans Airtable
+    if(currentFac.atId&&AT.token()){
+      await AT.update(AT.TABLES.factures,currentFac.atId,{[AT.FIELDS.factures.pdfUrl]:pdfUrl});
+    }
+
+    // 4. Envoyer via Make avec le lien
+    btn.textContent='Envoi email...';
+    const bodyWithLink = body+'\n\nTélécharger la facture : '+pdfUrl;
     const payload={
-      from: resendFrom,
-      to: [to],
-      subject: subject,
-      text: body,
-      attachments:[{
-        filename: filename,
-        content: pdfBase64Clean
-      }]
+      to, subject,
+      body: bodyWithLink,
+      facture_num: currentFac.num,
+      facture_total: fmtMoney(currentFac.total),
+      client_nom: currentFac.clientNom,
+      pdf_url: pdfUrl,
+      pdf_filename: filename
     };
 
-    const r=await fetch('https://api.resend.com/emails',{
+    const r=await fetch(cfg.webhook,{
       method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'Authorization':'Bearer '+resendKey
-      },
+      headers:{'Content-Type':'application/json','x-api-token':cfg.token||''},
       body:JSON.stringify(payload)
     });
 
-    const data=await r.json();
     if(r.ok){
       if(currentFac.atId&&AT.token()){
         await AT.update(AT.TABLES.factures,currentFac.atId,{[AT.FIELDS.factures.emailEnvoye]:true});
       }
       closeModal('modal-send');
-      toast('Facture envoyée à '+to+' !','success');
+      toast('Facture envoyée ! PDF disponible sur : '+pdfUrl,'success');
     }else{
-      toast('Erreur Resend : '+(data.message||data.name||'inconnu'),'error');
-      console.error('Resend error:', data);
+      toast('Erreur Make — vérifiez le webhook','error');
     }
   }catch(e){
     toast('Erreur : '+e.message,'error');
