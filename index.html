@@ -2052,24 +2052,27 @@ RÈGLES:
       })
     });
     if(!resp.ok) throw new Error('Webhook Make erreur '+resp.status);
-    const data=await resp.json();
+    // Lire en texte brut d'abord pour gérer les backticks
+    const rawText = await resp.text();
     let action=null;
     try{
-      // Nettoyer la réponse : enlever les backticks markdown si présents
-      let raw=data;
-      if(typeof data === 'string'){
-        raw = data.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-        action = JSON.parse(raw);
-      } else if(data.action){
-        action = data;
+      // Nettoyer les backticks markdown si présents
+      let clean = rawText.replace(/^```json\s*/,'').replace(/\s*```$/,'').trim();
+      // Si c'est encore du JSON imbriqué (ex: {"body":"```json..."})
+      let parsed = JSON.parse(clean);
+      // Si Make a encapsulé dans un objet body
+      if(typeof parsed === 'object' && parsed.body){
+        let inner = parsed.body.replace(/^```json\s*/,'').replace(/\s*```$/,'').trim();
+        action = JSON.parse(inner);
+      } else if(parsed.action){
+        action = parsed;
       } else {
-        let txt = data.text||data.response||data.message||JSON.stringify(data);
-        txt = txt.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+        let txt = parsed.text||parsed.response||parsed.message||JSON.stringify(parsed);
+        txt = txt.replace(/^```json\s*/,'').replace(/\s*```$/,'').trim();
         action = JSON.parse(txt);
       }
     }catch(e){
-      let txt = typeof data==='string'?data:(data.text||data.response||JSON.stringify(data));
-      txt = txt.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+      let txt = rawText.replace(/^```json\s*/,'').replace(/\s*```$/,'').trim();
       action={action:'info',message:txt};
     }
     await executeAIAction(action,resEl);
