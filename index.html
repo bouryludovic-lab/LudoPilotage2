@@ -1476,6 +1476,22 @@ async function saveFacture(){
   }
   const f={id:atId||Date.now().toString(),atId,num:document.getElementById('fn-num').value,date:document.getElementById('fn-date').value,echeance:echeanceDate,echeanceLabel,clientId:c.id,clientNom:c.nom,clientEmail:document.getElementById('fn-email').value,clientAdresse:c.adresse||'',clientSiret:c.siret||'',paiement:document.getElementById('fn-mode').value,iban:document.getElementById('fn-iban').value,notes:document.getElementById('fn-notes').value,lignes:ld,total,statut:'pending'};
   const F2=getFactures();F2.push(f);S.set('factures',F2);
+  // Auto-upload PDF sur GitHub après création
+  try{
+    toast('Génération PDF...','');
+    const pdfDataUri = await generatePdfBase64(f);
+    const pdfBase64Clean = pdfDataUri.split(',')[1];
+    const filename = 'facture-'+f.num+'.pdf';
+    const pdfUrl = await uploadPdfToGithub(pdfBase64Clean, filename);
+    if(pdfUrl){
+      f.pdfUrl = pdfUrl;
+      S.set('factures', getFactures().map(x=>x.id===f.id?f:x));
+      if(f.atId&&AT.token()){
+        await AT.update(AT.TABLES.factures, f.atId, {[AT.FIELDS.factures.pdfUrl]: pdfUrl});
+      }
+      toast('Facture enregistrée — PDF prêt ✓','success');
+    }
+  }catch(e){ console.warn('PDF upload failed:', e); }
   openPdf(f.id);
 }
 
@@ -1650,8 +1666,9 @@ function openSendModal(){
   document.getElementById('send-subject').value='Facture N° '+f.num+' — '+fmtMoney(f.total);
   document.getElementById('send-body').value=
     `Bonjour,\n\n`+
-    `Veuillez trouver ci-joint la facture N° `+f.num+` d'un montant de `+fmtMoney(f.total)+`.\n\n`+
+    `Veuillez trouver ci-dessous le lien vers votre facture N° `+f.num+` d'un montant de `+fmtMoney(f.total)+`.\n\n`+
     `Échéance : `+(f.echeanceLabel||`À réception`)+`\n\n`+
+    (f.pdfUrl ? `Consulter la facture : `+f.pdfUrl+`\n\n` : '')+
     `N'hésitez pas à me contacter pour toute question.\n\n`+
     `Cordialement,\n`+
     (p.nom||'');
@@ -1695,39 +1712,42 @@ async function sendInvoiceEmail(){
   const body=document.getElementById('send-body').value.trim();
   if(!to){toast('Entrez une adresse email','error');return;}
   const cfg=getConfig();
-  if(!cfg.ghToken){toast('Configurez votre token GitHub dans Telegram & Make','error');return;}
   if(!cfg.webhook){toast('Configurez le webhook Make dans Telegram & Make','error');return;}
 
   const btn=document.querySelector('#modal-send .btn-primary');
-  btn.textContent='Génération PDF...';btn.disabled=true;
+  btn.textContent='Envoi email...';btn.disabled=true;
 
   try{
-    // 1. Générer le PDF
-    const pdfDataUri = await generatePdfBase64(currentFac);
-    const pdfBase64Clean = pdfDataUri.split(',')[1];
-    const filename = 'facture-'+currentFac.num+'.pdf';
+    // Récupérer l'URL PDF déjà stockée (générée à la création)
+    let pdfUrl = currentFac.pdfUrl || '';
 
-    // 2. Uploader sur GitHub
-    btn.textContent='Upload GitHub...';
-    const pdfUrl = await uploadPdfToGithub(pdfBase64Clean, filename);
-    if(!pdfUrl){toast('Erreur upload GitHub — vérifiez votre token','error');return;}
-
-    // 3. Sauvegarder l'URL dans Airtable
-    if(currentFac.atId&&AT.token()){
-      await AT.update(AT.TABLES.factures,currentFac.atId,{[AT.FIELDS.factures.pdfUrl]:pdfUrl});
+    // Si pas encore uploadé, le faire maintenant
+    if(!pdfUrl){
+      if(!cfg.ghToken){toast('Token GitHub manquant — configurez-le dans Assistant & Config','error');btn.textContent='Envoyer';btn.disabled=false;return;}
+      btn.textContent='Génération PDF...';
+      const pdfDataUri = await generatePdfBase64(currentFac);
+      const pdfBase64Clean = pdfDataUri.split(',')[1];
+      const filename = 'facture-'+currentFac.num+'.pdf';
+      btn.textContent='Upload PDF...';
+      pdfUrl = await uploadPdfToGithub(pdfBase64Clean, filename);
+      if(!pdfUrl){toast('Erreur upload GitHub — vérifiez votre token','error');btn.textContent='Envoyer';btn.disabled=false;return;}
+      // Sauvegarder l'URL
+      currentFac.pdfUrl = pdfUrl;
+      S.set('factures', getFactures().map(x=>x.id===currentFac.id?currentFac:x));
+      if(currentFac.atId&&AT.token()){
+        await AT.update(AT.TABLES.factures,currentFac.atId,{[AT.FIELDS.factures.pdfUrl]:pdfUrl});
+      }
     }
 
-    // 4. Envoyer via Make avec le lien
     btn.textContent='Envoi email...';
-    const bodyWithLink = body+'\n\nTélécharger la facture : '+pdfUrl;
+    const bodyWithLink = body+'\n\nConsulter la facture en ligne : '+pdfUrl;
     const payload={
       to, subject,
       body: bodyWithLink,
       facture_num: currentFac.num,
       facture_total: fmtMoney(currentFac.total),
       client_nom: currentFac.clientNom,
-      pdf_url: pdfUrl,
-      pdf_filename: filename
+      pdf_url: pdfUrl
     };
 
     const r=await fetch(cfg.webhook,{
@@ -1741,7 +1761,7 @@ async function sendInvoiceEmail(){
         await AT.update(AT.TABLES.factures,currentFac.atId,{[AT.FIELDS.factures.emailEnvoye]:true});
       }
       closeModal('modal-send');
-      toast('Facture envoyée ! PDF disponible sur : '+pdfUrl,'success');
+      toast('Email envoyé ✓','success');
     }else{
       toast('Erreur Make — vérifiez le webhook','error');
     }
@@ -2133,7 +2153,22 @@ async function executeAIAction(action,resEl){
       const F2 = getFactures(); F2.push(f); S.set('factures', F2);
       renderDash();
       resEl.style.background='#f0fdf4';resEl.style.borderColor='#86efac';
-      resEl.innerHTML='✅ Facture <strong>'+num+'</strong> creee — '+c.nom+' — <strong>'+fmtMoney(total)+'</strong>'+(atId?'<br><small>✓ Enregistree dans Airtable</small>':'');
+      resEl.innerHTML='✅ Facture <strong>'+num+'</strong> créée — '+c.nom+' — <strong>'+fmtMoney(total)+'</strong>'+(atId?'<br><small>✓ Airtable — Génération PDF en cours...</small>':'');
+      // Auto-upload PDF
+      try{
+        const pdfDataUri = await generatePdfBase64(f);
+        const pdfBase64Clean = pdfDataUri.split(',')[1];
+        const filename = 'facture-'+f.num+'.pdf';
+        const pdfUrl = await uploadPdfToGithub(pdfBase64Clean, filename);
+        if(pdfUrl){
+          f.pdfUrl = pdfUrl;
+          S.set('factures', getFactures().map(x=>x.id===f.id?f:x));
+          if(f.atId&&AT.token()){
+            await AT.update(AT.TABLES.factures, f.atId, {[AT.FIELDS.factures.pdfUrl]: pdfUrl});
+          }
+          resEl.innerHTML='✅ Facture <strong>'+num+'</strong> créée — '+c.nom+' — <strong>'+fmtMoney(total)+'</strong><br><small>✓ Airtable · ✓ PDF disponible : <a href="'+pdfUrl+'" target="_blank">voir la facture</a></small>';
+        }
+      }catch(e){ console.warn('PDF upload failed:', e); }
       break;
     }
     case 'create_client':{
