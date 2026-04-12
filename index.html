@@ -1742,6 +1742,7 @@ async function sendInvoiceEmail(){
     btn.textContent='Envoi email...';
     const bodyWithLink = body+'\n\nConsulter la facture en ligne : '+pdfUrl;
     const payload={
+      type: 'send_email',
       to, subject,
       body: bodyWithLink,
       facture_num: currentFac.num,
