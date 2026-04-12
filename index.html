@@ -50,6 +50,7 @@ const AT = {
       prefix:    'fld7qz7VqdYpdjcVf',
       pin:       'fldlA797JhQZDCWPb',
       token:     'fldWDPsM4ssVgaq2e',
+      logo:      'fldLOGO00000000001',
     }
   },
   token: () => localStorage.getItem('at_token') || '',
@@ -651,7 +652,25 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
           <div class="field"><label class="lbl">Préfixe numérotation</label><input id="pp-prefix" placeholder="2025-" value="2025-"/></div>
         </div>
       </div>
-      <div style="display:flex;justify-content:flex-end">
+      <!-- Logo -->
+      <div class="form-section" style="margin-top:16px">
+        <div class="form-section-title">Logo</div>
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <div id="logo-preview" style="width:200px;height:64px;border:1.5px dashed var(--color-border-tertiary);border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--color-background-secondary);overflow:hidden">
+            <span id="logo-placeholder" style="font-size:12px;color:var(--color-text-secondary)">Aucun logo</span>
+            <img id="logo-img" style="max-width:100%;max-height:100%;display:none;object-fit:contain"/>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <label class="btn" style="cursor:pointer;font-size:13px;padding:6px 14px">
+              📁 Choisir un logo
+              <input type="file" id="logo-input" accept="image/*" style="display:none" onchange="previewLogo(this)"/>
+            </label>
+            <button class="btn" style="font-size:13px;padding:6px 14px" onclick="removeLogo()">✕ Supprimer</button>
+          </div>
+          <div style="font-size:12px;color:var(--color-text-secondary);max-width:220px">PNG ou SVG recommandé. Affiché sur vos factures et votre signature email.</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:16px">
         <button class="btn btn-primary" onclick="saveProfil()">Enregistrer le profil</button>
       </div>
     </div>
@@ -872,7 +891,7 @@ const S={
   get:(k,d={})=>{try{return JSON.parse(localStorage.getItem(k))||d}catch{return d}},
   set:(k,v)=>localStorage.setItem(k,JSON.stringify(v))
 };
-const getProfil=()=>S.get('profil',{nom:'',siret:'',adresse:'',email:'',tel:'',iban:'',prefix:'2025-'});
+const getProfil=()=>S.get('profil',{nom:'',siret:'',adresse:'',email:'',tel:'',iban:'',prefix:'2025-',logo:''});
 const getClients=()=>S.get('clients',[]);
 const getFactures=()=>S.get('factures',[]);
 const getConfig=()=>S.get('config',{webhook:'',token:''});
@@ -1159,7 +1178,7 @@ function markPaid(){
 
 function buildPdf(f){
   const p=getProfil();
-  const LOGO="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMjAgMTAwIiB3aWR0aD0iMzIwIiBoZWlnaHQ9IjEwMCI+CiAgPCEtLSBDYXJyw6kgVE5TIC0tPgogIDxyZWN0IHg9IjIiIHk9IjIiIHdpZHRoPSI4OCIgaGVpZ2h0PSI4OCIgZmlsbD0id2hpdGUiIHN0cm9rZT0iIzFhMjc0NCIgc3Ryb2tlLXdpZHRoPSIzIi8+CiAgPHRleHQgeD0iNDQiIHk9IjUyIiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzMiIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iIzFhMjc0NCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+VE5TPC90ZXh0PgogIDxjaXJjbGUgY3g9IjQ0IiBjeT0iNzIiIHI9IjciIGZpbGw9IiMyZTdkZTkiLz4KICA8IS0tIFPDqXBhcmF0ZXVyIHZlcnRpY2FsIC0tPgogIDxsaW5lIHgxPSIxMDAiIHkxPSIxMCIgeDI9IjEwMCIgeTI9IjgyIiBzdHJva2U9IiNlMGUwZTAiIHN0cm9rZS13aWR0aD0iMSIvPgogIDwhLS0gVGV4dGUgZHJvaXQgLS0+CiAgPHRleHQgeD0iMTE0IiB5PSI0MiIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiMxYTI3NDQiIGxldHRlci1zcGFjaW5nPSIxIj5USEUgTkVYVCBTVEVQPC90ZXh0PgogIDxsaW5lIHgxPSIxMTQiIHkxPSI1MiIgeDI9IjMxMCIgeTI9IjUyIiBzdHJva2U9IiMyZTdkZTkiIHN0cm9rZS13aWR0aD0iMiIvPgogIDx0ZXh0IHg9IjExNCIgeT0iNzAiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiBmb250LXNpemU9IjExIiBmb250LXdlaWdodD0iNDAwIiBmaWxsPSIjNjY2IiBsZXR0ZXItc3BhY2luZz0iMiI+Q09OU1VMVElORyAmYW1wOyBTVFJBVEVHWTwvdGV4dD4KPC9zdmc+";
+  const LOGO=p.logo||"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMjAgMTAwIiB3aWR0aD0iMzIwIiBoZWlnaHQ9IjEwMCI+CiAgPCEtLSBDYXJyw6kgVE5TIC0tPgogIDxyZWN0IHg9IjIiIHk9IjIiIHdpZHRoPSI4OCIgaGVpZ2h0PSI4OCIgZmlsbD0id2hpdGUiIHN0cm9rZT0iIzFhMjc0NCIgc3Ryb2tlLXdpZHRoPSIzIi8+CiAgPHRleHQgeD0iNDQiIHk9IjUyIiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzMiIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iIzFhMjc0NCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+VE5TPC90ZXh0PgogIDxjaXJjbGUgY3g9IjQ0IiBjeT0iNzIiIHI9IjciIGZpbGw9IiMyZTdkZTkiLz4KICA8IS0tIFPDqXBhcmF0ZXVyIHZlcnRpY2FsIC0tPgogIDxsaW5lIHgxPSIxMDAiIHkxPSIxMCIgeDI9IjEwMCIgeTI9IjgyIiBzdHJva2U9IiNlMGUwZTAiIHN0cm9rZS13aWR0aD0iMSIvPgogIDwhLS0gVGV4dGUgZHJvaXQgLS0+CiAgPHRleHQgeD0iMTE0IiB5PSI0MiIgZm9udC1mYW1pbHk9IkFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiMxYTI3NDQiIGxldHRlci1zcGFjaW5nPSIxIj5USEUgTkVYVCBTVEVQPC90ZXh0PgogIDxsaW5lIHgxPSIxMTQiIHkxPSI1MiIgeDI9IjMxMCIgeTI9IjUyIiBzdHJva2U9IiMyZTdkZTkiIHN0cm9rZS13aWR0aD0iMiIvPgogIDx0ZXh0IHg9IjExNCIgeT0iNzAiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiBmb250LXNpemU9IjExIiBmb250LXdlaWdodD0iNDAwIiBmaWxsPSIjNjY2IiBsZXR0ZXItc3BhY2luZz0iMiI+Q09OU1VMVElORyAmYW1wOyBTVFJBVEVHWTwvdGV4dD4KPC9zdmc+";
   const fv=(f.lignes||[]).map(l=>'<tr>'
     +'<td style="padding:10px 16px;border-bottom:1px solid #eef2f7;font-size:13px">'+esc(l.desc)+'</td>'
     +'<td style="padding:10px 16px;border-bottom:1px solid #eef2f7;font-size:13px;text-align:center">'+l.qte+'</td>'
@@ -1236,6 +1255,34 @@ function renderProfil(){
   document.getElementById('pp-tel').value=p.tel||'';
   document.getElementById('pp-iban').value=p.iban||'';
   document.getElementById('pp-prefix').value=p.prefix||'2025-';
+  // Afficher le logo si présent
+  if(p.logo){
+    document.getElementById('logo-img').src=p.logo;
+    document.getElementById('logo-img').style.display='block';
+    document.getElementById('logo-placeholder').style.display='none';
+  }
+}
+
+function previewLogo(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const data=e.target.result;
+    document.getElementById('logo-img').src=data;
+    document.getElementById('logo-img').style.display='block';
+    document.getElementById('logo-placeholder').style.display='none';
+    // Stocker temporairement
+    const p=getProfil();p.logo=data;S.set('profil',p);
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeLogo(){
+  document.getElementById('logo-img').src='';
+  document.getElementById('logo-img').style.display='none';
+  document.getElementById('logo-placeholder').style.display='block';
+  document.getElementById('logo-input').value='';
+  const p=getProfil();p.logo='';S.set('profil',p);
 }
 function saveProfil(){
   S.set('profil',{nom:document.getElementById('pp-nom').value,siret:document.getElementById('pp-siret').value,adresse:document.getElementById('pp-adresse').value,email:document.getElementById('pp-email').value,tel:document.getElementById('pp-tel').value,iban:document.getElementById('pp-iban').value,prefix:document.getElementById('pp-prefix').value});
@@ -1377,11 +1424,15 @@ async function syncProfil(){
   if(!records||!records.length) return;
   const r=records.find(x=>(x.fields||{})['Clé']==='profil')||records[0];
   const f=r.fields||{};const p=getProfil();
+  // Récupérer le logo depuis Airtable (champ attachment)
+  let logoUrl = p.logo||'';
+  if(f['Logo']&&f['Logo'].length>0) logoUrl = f['Logo'][0].url||logoUrl;
   S.set('profil',{atId:r.id,
     nom:f['Nom']||p.nom||'',siret:f['SIRET']||p.siret||'',
     adresse:f['Adresse']||p.adresse||'',email:f['Email']||p.email||'',
     tel:f['Téléphone']||p.tel||'',iban:f['IBAN']||p.iban||'',
-    prefix:f['Préfixe numérotation']||p.prefix||'2025-'});
+    prefix:f['Préfixe numérotation']||p.prefix||'2025-',
+    logo:logoUrl});
   // Sync clés API depuis Airtable vers config locale
   const cfg=getConfig();
   if(f['Clé API Claude']&&!cfg.claudeKey) {
