@@ -418,6 +418,11 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
     <div class="nav-item" onclick="go('telegram')">
       <div class="nav-dot"></div> Assistant & Config
     </div>
+    <div class="nav-section">Coaching</div>
+    <div class="nav-item" onclick="go('coaching')">
+      <div class="nav-dot"></div> Questions élèves
+      <span class="nav-badge" id="badge-coaching" style="display:none">0</span>
+    </div>
     <div class="nav-item" onclick="go('howto')">
       <div class="nav-dot"></div> How to use
     </div>
@@ -756,7 +761,64 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
     </div>
 
     <!-- HOW TO USE -->
-    <div id="screen-howto" class="screen">
+    <!-- COACHING -->
+    <div id="screen-coaching" class="screen">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button onclick="filterCoaching('all')" id="cf-all" class="btn btn-primary" style="font-size:12px;padding:5px 12px">Toutes</button>
+          <button onclick="filterCoaching('new')" id="cf-new" class="btn" style="font-size:12px;padding:5px 12px">🔴 À analyser</button>
+          <button onclick="filterCoaching('pending')" id="cf-pending" class="btn" style="font-size:12px;padding:5px 12px">🟡 En attente validation</button>
+          <button onclick="filterCoaching('done')" id="cf-done" class="btn" style="font-size:12px;padding:5px 12px">✅ Validées</button>
+        </div>
+        <button onclick="syncCoaching()" class="btn" style="font-size:12px;padding:5px 12px">⟳ Actualiser</button>
+      </div>
+      <div id="coaching-list">
+        <div style="text-align:center;padding:40px;color:var(--slate-400);font-size:13px">Chargement...</div>
+      </div>
+    </div>
+
+    <!-- MODAL COACHING -->
+    <div class="overlay" id="modal-coaching">
+      <div class="modal modal-wide">
+        <div class="modal-head">
+          <div class="modal-title" id="coaching-modal-title">Question élève</div>
+          <button class="btn btn-ghost btn-icon" onclick="closeModal('modal-coaching')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <!-- Colonne gauche : contexte -->
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--slate-500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Élève</div>
+            <div id="cm-eleve" style="font-size:14px;font-weight:600;color:var(--slate-900);margin-bottom:12px"></div>
+            <div style="font-size:11px;font-weight:700;color:var(--slate-500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Question</div>
+            <div id="cm-question" style="font-size:13px;color:var(--slate-700);background:var(--slate-50);border:1px solid var(--slate-200);border-radius:8px;padding:12px;line-height:1.6;margin-bottom:12px;white-space:pre-wrap"></div>
+            <div style="font-size:11px;font-weight:700;color:var(--slate-500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Promesse / Contexte</div>
+            <div id="cm-promesse" style="font-size:12px;color:var(--slate-600);background:var(--slate-50);border:1px solid var(--slate-200);border-radius:8px;padding:10px;line-height:1.6;white-space:pre-wrap;margin-bottom:10px"></div>
+            <div id="cm-pj-section" style="display:none">
+              <div style="font-size:11px;font-weight:700;color:var(--slate-500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Pièces jointes</div>
+              <div id="cm-pj-list" style="display:flex;flex-direction:column;gap:6px"></div>
+            </div>
+          </div>
+          <!-- Colonne droite : réponse -->
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="font-size:11px;font-weight:700;color:var(--slate-500);text-transform:uppercase;letter-spacing:.5px">Réponse</div>
+              <button onclick="generateAIResponse()" id="btn-gen-ai" class="btn btn-primary" style="font-size:12px;padding:4px 12px">✨ Générer avec IA</button>
+            </div>
+            <textarea id="cm-reponse" style="flex:1;min-height:280px;border:1.5px solid var(--slate-200);border-radius:8px;padding:12px;font-size:13px;font-family:inherit;resize:vertical;line-height:1.6" placeholder="La réponse apparaîtra ici après génération IA — vous pouvez la modifier avant de valider"></textarea>
+            <div id="cm-ai-status" style="font-size:12px;color:var(--slate-400);min-height:18px"></div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-secondary" onclick="closeModal('modal-coaching')">Annuler</button>
+          <button class="btn" style="background:#f59e0b;color:white;border:none" onclick="saveCoachingDraft()">💾 Sauvegarder brouillon</button>
+          <button class="btn btn-primary" style="background:#059669" onclick="validateCoachingResponse()">✅ Valider & marquer traitée</button>
+        </div>
+      </div>
+    </div>
+
+        <div id="screen-howto" class="screen">
 
       <div class="form-section">
         <div class="form-section-title">Commandes reconnues par le bot</div>
@@ -937,7 +999,7 @@ function toast(msg,type=''){
 }
 
 // ── NAVIGATION ───────────────────────────────────────────────────────────────
-const titles={dashboard:'Tableau de bord',factures:'Factures',clients:'Clients',nouvelle:'Nouvelle facture',profil:'Mon profil',telegram:'Assistant & Config',howto:'How to use'};
+const titles={dashboard:'Tableau de bord',factures:'Factures',clients:'Clients',nouvelle:'Nouvelle facture',profil:'Mon profil',telegram:'Assistant & Config',howto:'How to use',coaching:'Questions élèves'};
 
 function go(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
@@ -946,7 +1008,7 @@ function go(id){
   document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')?.includes("'"+id+"'"))n.classList.add('active')});
   document.getElementById('page-title').textContent=titles[id]||'';
   closeSidebar();
-  const renders={dashboard:renderDash,factures:renderFac,clients:renderCli,nouvelle:initNouv,profil:renderProfil,telegram:renderTelegram};
+  const renders={dashboard:renderDash,factures:renderFac,clients:renderCli,nouvelle:initNouv,profil:renderProfil,telegram:renderTelegram,coaching:renderCoaching};
   if(renders[id])renders[id]();
 }
 
@@ -1583,6 +1645,300 @@ async function delClient(id){
   const C=getClients(),c=C.find(x=>x.id===id);
   if(c?.atId&&AT.token())await AT.delete(AT.TABLES.clients,c.atId);
   S.set('clients',C.filter(x=>x.id!==id));renderCli();toast('Client supprimé');
+}
+
+
+// ── COACHING ──────────────────────────────────────────────────────────────────
+const COACHING = {
+  BASE: 'appH96NqwcLJqeXwM',
+  TABLE: 'tblq0vNsgD8cznFRT',
+  FIELDS: {
+    prenom:    'fldoVnoPiBvIJyCkk',
+    nom:       'fldOCauai03eYScVW',
+    coach:     'fldERaiMlOx2woWkK',
+    etat:      'fld7cMzPI1tb8lJY9',
+    promesse:  'fldaumyA3uRwhrYsy',
+    offre:     'fldSfF7McB955Hssy',
+    offrePdf:  'fldZkPCjzX6s8et0L',
+    question:  'fldmeA3uel8jx0SOQ',
+    notes:     'fldnZIr9mWzJMXBwA',
+    reponseIA: 'fldlmaSoEUizk4Pfk',
+    reponseFin:'fldhnwXFH04PckOBv',
+    dateRep:   'fldZemIRCsue89dyN',
+    created:   'fldc51sOVcXBPCLYb',
+  }
+};
+
+let coachingRecords = [];
+let currentCoachingId = null;
+let coachingFilter = 'all';
+
+async function syncCoaching() {
+  const el = document.getElementById('coaching-list');
+  el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--slate-400);font-size:13px">Chargement...</div>';
+  try {
+    const token = AT.token();
+    if(!token){ el.innerHTML='<div style="padding:20px;color:var(--amber-700)">⚠️ Token Airtable manquant</div>'; return; }
+    // Filtrer uniquement les records assignés à Ludo
+    let url = `https://api.airtable.com/v0/${COACHING.BASE}/${COACHING.TABLE}?pageSize=100&sort[0][field]=Created+time&sort[0][direction]=desc&filterByFormula={Coach}='Ludo'`;
+    const r = await fetch(url, {headers:{'Authorization':'Bearer '+token}});
+    if(!r.ok) throw new Error('Erreur '+r.status);
+    const d = await r.json();
+    coachingRecords = (d.records||[]).map(rec => ({
+      id: rec.id,
+      prenom: (rec.fields[COACHING.FIELDS.prenom]||[]).join(' ') || rec.fields['Prénom'] || '',
+      nom: (rec.fields[COACHING.FIELDS.nom]||[]).join(' ') || rec.fields['Nom'] || '',
+      etat: rec.fields[COACHING.FIELDS.etat]?.name || rec.fields['Etat de la demande']?.name || 'Nouvelle soumission (a Analyser)',
+      promesse: rec.fields[COACHING.FIELDS.promesse] || rec.fields['Promesse'] || '',
+      offre: rec.fields[COACHING.FIELDS.offre] || rec.fields['Offre'] || '',
+      question: rec.fields[COACHING.FIELDS.question] || rec.fields['Question'] || '',
+      notes: rec.fields[COACHING.FIELDS.notes] || rec.fields['Notes Coach'] || '',
+      reponseIA: rec.fields[COACHING.FIELDS.reponseIA] || rec.fields['Réponse IA'] || '',
+      reponseFin: rec.fields[COACHING.FIELDS.reponseFin] || rec.fields['Réponse finale'] || '',
+      created: rec.fields[COACHING.FIELDS.created] || '',
+      piecesJointes: rec.fields[COACHING.FIELDS.offrePdf] || rec.fields['Offre PDF'] || [],
+    }));
+    // Badge
+    const newCount = coachingRecords.filter(r => r.etat === 'Nouvelle soumission (a Analyser)').length;
+    const b = document.getElementById('badge-coaching');
+    if(b){ b.textContent=newCount; b.style.display=newCount?'':'none'; }
+    renderCoachingList();
+  } catch(e) {
+    el.innerHTML = '<div style="padding:20px;color:var(--red-700)">❌ Erreur : '+e.message+'</div>';
+  }
+}
+
+function renderCoaching() { syncCoaching(); }
+
+function filterCoaching(f) {
+  coachingFilter = f;
+  ['all','new','pending','done'].forEach(x => {
+    const btn = document.getElementById('cf-'+x);
+    if(btn) btn.className = x===f ? 'btn btn-primary' : 'btn';
+    if(btn && x===f) btn.style.cssText='font-size:12px;padding:5px 12px';
+    else if(btn) btn.style.cssText='font-size:12px;padding:5px 12px';
+  });
+  renderCoachingList();
+}
+
+function renderCoachingList() {
+  const el = document.getElementById('coaching-list');
+  let records = coachingRecords;
+  if(coachingFilter === 'new') records = records.filter(r => r.etat === 'Nouvelle soumission (a Analyser)');
+  else if(coachingFilter === 'pending') records = records.filter(r => r.etat === 'Validée' && !r.reponseFin);
+  else if(coachingFilter === 'done') records = records.filter(r => r.reponseFin);
+
+  if(!records.length){
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--slate-400);font-size:13px">Aucune question dans cette catégorie</div>';
+    return;
+  }
+
+  el.innerHTML = records.map(r => {
+    const isNew = r.etat === 'Nouvelle soumission (a Analyser)';
+    const hasIA = !!r.reponseIA;
+    const isDone = !!r.reponseFin;
+    const badgeColor = isDone ? '#059669' : isNew ? '#dc2626' : '#f59e0b';
+    const badgeLabel = isDone ? '✅ Traitée' : isNew ? '🔴 À analyser' : '🟡 Brouillon';
+    const date = r.created ? new Date(r.created).toLocaleDateString('fr-FR') : '';
+    return `<div onclick="openCoaching('${r.id}')" style="cursor:pointer;background:white;border:1px solid var(--slate-200);border-left:4px solid ${badgeColor};border-radius:8px;padding:14px 16px;margin-bottom:10px;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow='none'">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <div style="font-size:14px;font-weight:600;color:var(--slate-900)">${r.prenom} ${r.nom}</div>
+            <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:${badgeColor}20;color:${badgeColor};font-weight:500">${badgeLabel}</span>
+            ${hasIA && !isDone ? '<span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#eff6ff;color:#1d4ed8">✨ IA prête</span>' : ''}
+          </div>
+          <div style="font-size:13px;color:var(--slate-600);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${r.question||'Pas de question'}</div>
+        </div>
+        <div style="font-size:11px;color:var(--slate-400);white-space:nowrap">${date}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openCoaching(id) {
+  const r = coachingRecords.find(x => x.id === id);
+  if(!r) return;
+  currentCoachingId = id;
+  document.getElementById('coaching-modal-title').textContent = (r.prenom+' '+r.nom).trim() || 'Question élève';
+  document.getElementById('cm-eleve').textContent = (r.prenom+' '+r.nom).trim() || '—';
+  document.getElementById('cm-question').textContent = r.question || '—';
+  document.getElementById('cm-promesse').textContent = r.promesse || r.offre || '—';
+  document.getElementById('cm-reponse').value = r.reponseFin || r.reponseIA || '';
+  document.getElementById('cm-ai-status').textContent = r.reponseIA ? '✨ Réponse IA disponible — modifiez si besoin avant de valider' : '';
+
+  // Pièces jointes
+  const pjSection = document.getElementById('cm-pj-section');
+  const pjList = document.getElementById('cm-pj-list');
+  if(r.piecesJointes && r.piecesJointes.length > 0){
+    pjSection.style.display = 'block';
+    pjList.innerHTML = r.piecesJointes.map((pj,i) => {
+      const isPdf = pj.type === 'application/pdf';
+      const isDoc = pj.type?.includes('word') || pj.type?.includes('excel') || pj.type?.includes('spreadsheet');
+      const icon = isPdf ? '📄' : isDoc ? '📊' : '📎';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--slate-50);border:1px solid var(--slate-200);border-radius:6px">
+        <span>${icon}</span>
+        <span style="flex:1;font-size:12px;color:var(--slate-700);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pj.filename}</span>
+        <a href="${pj.url}" target="_blank" style="font-size:11px;color:#3b82f6;text-decoration:none;white-space:nowrap">↗ Ouvrir</a>
+        ${isPdf ? `<button onclick="readPdfForAI(${i})" style="font-size:11px;padding:2px 8px;border:1px solid #3b82f6;border-radius:4px;background:white;color:#3b82f6;cursor:pointer">✨ Lire pour IA</button>` : ''}
+      </div>`;
+    }).join('');
+  } else {
+    pjSection.style.display = 'none';
+  }
+  openModal('modal-coaching');
+}
+
+async function readPdfForAI(pjIndex) {
+  const r = coachingRecords.find(x => x.id === currentCoachingId);
+  if(!r || !r.piecesJointes[pjIndex]) return;
+  const pj = r.piecesJointes[pjIndex];
+  const status = document.getElementById('cm-ai-status');
+  status.textContent = '⏳ Lecture du PDF en cours...';
+
+  try {
+    // Télécharger le PDF en base64
+    const resp = await fetch(pj.url);
+    const blob = await resp.blob();
+    const base64 = await new Promise(res => {
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result.split(',')[1]);
+      reader.readAsDataURL(blob);
+    });
+
+    // Envoyer à Claude pour extraction via l'API Anthropic directement
+    const cfg = getConfig();
+    const claudeKey = cfg.claudeKey || '';
+    if(!claudeKey){ status.textContent='⚠️ Clé API Claude manquante dans Configuration'; return; }
+
+    const apiResp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01'},
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: [
+            {type:'document', source:{type:'base64', media_type:'application/pdf', data:base64}},
+            {type:'text', text:"Résume ce document en 3-5 points clés sur la promesse et l'offre de cet élève infopreneur. Sois concis et factuel."}
+          ]
+        }]
+      })
+    });
+
+    const data = await apiResp.json();
+    const resume = data.content?.[0]?.text || 'Impossible de lire le document';
+
+    // Ajouter le résumé à la zone promesse
+    const promesseEl = document.getElementById('cm-promesse');
+    promesseEl.textContent = (promesseEl.textContent || '') + '\n\n📄 Résumé ' + pj.filename + ':\n' + resume;
+
+    // Mettre à jour le record en mémoire
+    const idx = coachingRecords.findIndex(x=>x.id===currentCoachingId);
+    if(idx>-1) coachingRecords[idx].promesse = promesseEl.textContent;
+
+    status.textContent = '✅ Document lu — cliquez "Générer avec IA" pour prendre en compte ce contexte';
+  } catch(e) {
+    status.textContent = '❌ Erreur lecture PDF : ' + e.message;
+  }
+}
+
+async function generateAIResponse() {
+  const r = coachingRecords.find(x => x.id === currentCoachingId);
+  if(!r) return;
+  const btn = document.getElementById('btn-gen-ai');
+  const status = document.getElementById('cm-ai-status');
+  btn.disabled = true; btn.textContent = '⏳ Génération...';
+  status.textContent = 'Claude analyse la question...';
+
+  const cfg = getConfig();
+  if(!cfg.webhook){ status.textContent='⚠️ Webhook Make non configuré'; btn.disabled=false; btn.textContent='✨ Générer avec IA'; return; }
+
+  // Récupérer le contexte enrichi depuis la modal (peut inclure résumé PDF)
+  const promesseEnrichie = document.getElementById('cm-promesse')?.textContent || r.promesse || '';
+
+  const systemPrompt = `Tu es Ludovic Boury, coach expert en création d'infopreneuriat. Tu accompagnes des élèves dans le programme "Alchimie" pour devenir infopreneur.
+
+CONTEXTE DE L'ÉLÈVE:
+- Nom: ${r.prenom} ${r.nom}
+- Promesse/Projet: ${promesseEnrichie||r.promesse||'Non renseigné'}
+- Offre: ${r.offre||'Non renseignée'}
+
+Tu réponds à la question de l\'élève de manière personnalisée, bienveillante et actionnable. Tu utilises un ton coach — direct, encourageant, concret. Tes réponses font entre 100 et 300 mots. Tu tutoies l\'élève.
+
+Réponds UNIQUEMENT avec la réponse au format texte brut, sans JSON, sans markdown.`;
+
+  try {
+    const resp = await fetch(cfg.webhook, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        type: 'ai_query',
+        query: r.question,
+        system: systemPrompt,
+        claude_key: cfg.claudeKey || ''
+      })
+    });
+    const rawText = await resp.text();
+    let reponse = rawText;
+    // Si c'est du JSON (format habituel), extraire le message
+    try {
+      const parsed = JSON.parse(rawText.replace(/^```json\s*/,'').replace(/\s*```$/,'').trim());
+      reponse = parsed.message || parsed.body || rawText;
+    } catch(e) { /* pas du JSON, garder tel quel */ }
+
+    document.getElementById('cm-reponse').value = reponse;
+    status.textContent = '✨ Réponse générée — modifiez si besoin avant de valider';
+    // Sauvegarder la réponse IA dans Airtable
+    await fetch(`https://api.airtable.com/v0/${COACHING.BASE}/${COACHING.TABLE}/${currentCoachingId}`, {
+      method: 'PATCH',
+      headers: {'Authorization':'Bearer '+AT.token(),'Content-Type':'application/json'},
+      body: JSON.stringify({fields:{[COACHING.FIELDS.reponseIA]: reponse}})
+    });
+    const idx = coachingRecords.findIndex(x=>x.id===currentCoachingId);
+    if(idx>-1) coachingRecords[idx].reponseIA = reponse;
+  } catch(e) {
+    status.textContent = '❌ Erreur : '+e.message;
+  }
+  btn.disabled=false; btn.textContent='✨ Générer avec IA';
+}
+
+async function saveCoachingDraft() {
+  const reponse = document.getElementById('cm-reponse').value.trim();
+  if(!reponse){ toast('Entrez une réponse','error'); return; }
+  try {
+    await fetch(`https://api.airtable.com/v0/${COACHING.BASE}/${COACHING.TABLE}/${currentCoachingId}`, {
+      method: 'PATCH',
+      headers: {'Authorization':'Bearer '+AT.token(),'Content-Type':'application/json'},
+      body: JSON.stringify({fields:{[COACHING.FIELDS.reponseFin]: reponse}})
+    });
+    const idx = coachingRecords.findIndex(x=>x.id===currentCoachingId);
+    if(idx>-1) coachingRecords[idx].reponseFin = reponse;
+    toast('Brouillon sauvegardé ✓','success');
+  } catch(e) { toast('Erreur : '+e.message,'error'); }
+}
+
+async function validateCoachingResponse() {
+  const reponse = document.getElementById('cm-reponse').value.trim();
+  if(!reponse){ toast('La réponse est vide','error'); return; }
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    await fetch(`https://api.airtable.com/v0/${COACHING.BASE}/${COACHING.TABLE}/${currentCoachingId}`, {
+      method: 'PATCH',
+      headers: {'Authorization':'Bearer '+AT.token(),'Content-Type':'application/json'},
+      body: JSON.stringify({fields:{
+        [COACHING.FIELDS.reponseFin]: reponse,
+        [COACHING.FIELDS.etat]: 'Validée',
+        [COACHING.FIELDS.dateRep]: today
+      }})
+    });
+    const idx = coachingRecords.findIndex(x=>x.id===currentCoachingId);
+    if(idx>-1){ coachingRecords[idx].reponseFin=reponse; coachingRecords[idx].etat='Validée'; }
+    closeModal('modal-coaching');
+    renderCoachingList();
+    toast('Réponse validée ✓','success');
+  } catch(e) { toast('Erreur : '+e.message,'error'); }
 }
 
 // ── AUTH / PIN ────────────────────────────────────────────────────────────────
