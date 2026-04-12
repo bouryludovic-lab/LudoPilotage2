@@ -2101,7 +2101,7 @@ async function executeAIAction(action,resEl){
       const firstPu=document.querySelector('.ln-pu');
       if(firstDesc) firstDesc.value=action.desc||'';
       if(firstPu){firstPu.value=action.montant;firstPu.dispatchEvent(new Event('input'));}
-      calcTotal();
+      calcTot();
       resEl.style.background='#f0fdf4';resEl.style.borderColor='#86efac';
       resEl.innerHTML='✅ Formulaire prêt — '+c.nom+' — '+fmtMoney(action.montant)+'<br><small>Vérifiez et cliquez "Enregistrer & aperçu PDF"</small>';
       break;
