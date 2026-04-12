@@ -2092,18 +2092,43 @@ async function executeAIAction(action,resEl){
         resEl.innerHTML='⚠️ Client "'+action.client+'" introuvable. Clients : '+getClients().map(x=>x.nom).join(', ');
         return;
       }
-      go('nouvelle');
-      await new Promise(r=>setTimeout(r,300));
-      document.getElementById('fn-client').value=c.id;
-      fillClient();
-      if(document.getElementById('lignes-wrap').children.length===0) addLine();
-      const firstDesc=document.querySelector('.ln-desc');
-      const firstPu=document.querySelector('.ln-pu');
-      if(firstDesc) firstDesc.value=action.desc||'';
-      if(firstPu){firstPu.value=action.montant;firstPu.dispatchEvent(new Event('input'));}
-      calcTot();
+      const ld = action.lignes && action.lignes.length
+        ? action.lignes
+        : [{desc: action.desc||'Prestation de service', qte: action.qte||1, pu: action.montant||0}];
+      const total = ld.reduce((s,l)=>s+(l.qte||1)*(l.pu||0), 0) || action.montant || 0;
+      const num = nextNum();
+      const dateAuj = new Date().toISOString().split('T')[0];
+      const p = getProfil();
+      let atId = null;
+      if(AT.token()){
+        const F = AT.FIELDS.factures;
+        const fields = {
+          [F.num]: num,
+          [F.client]: c.nom,
+          [F.montant]: total,
+          [F.date]: dateAuj,
+          [F.echeance]: 'A reception',
+          [F.statut]: 'En attente',
+          [F.prestation]: ld.map(l=>l.desc).join(', '),
+          [F.paiement]: 'Virement',
+          [F.email]: c.email||''
+        };
+        if(c.atId) fields[F.lienClient] = [c.atId];
+        const rec = await AT.create(AT.TABLES.factures, fields);
+        atId = rec?.id || null;
+      }
+      const f = {
+        id: atId||Date.now().toString(), atId, num, date: dateAuj,
+        echeance: dateAuj, echeanceLabel: 'A reception',
+        clientId: c.id, clientNom: c.nom, clientEmail: c.email||'',
+        clientAdresse: c.adresse||'', clientSiret: c.siret||'',
+        paiement: 'Virement', iban: p.iban||'', notes: '',
+        lignes: ld, total, statut: 'pending'
+      };
+      const F2 = getFactures(); F2.push(f); S.set('factures', F2);
+      renderDash();
       resEl.style.background='#f0fdf4';resEl.style.borderColor='#86efac';
-      resEl.innerHTML='✅ Formulaire prêt — '+c.nom+' — '+fmtMoney(action.montant)+'<br><small>Vérifiez et cliquez "Enregistrer & aperçu PDF"</small>';
+      resEl.innerHTML='✅ Facture <strong>'+num+'</strong> creee — '+c.nom+' — <strong>'+fmtMoney(total)+'</strong>'+(atId?'<br><small>✓ Enregistree dans Airtable</small>':'');
       break;
     }
     case 'create_client':{
