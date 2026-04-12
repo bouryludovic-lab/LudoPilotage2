@@ -1666,10 +1666,9 @@ function openSendModal(){
   document.getElementById('send-subject').value='Facture N° '+f.num+' — '+fmtMoney(f.total);
   document.getElementById('send-body').value=
     `Bonjour,\n\n`+
-    `Veuillez trouver ci-dessous le lien vers votre facture N° `+f.num+` d'un montant de `+fmtMoney(f.total)+`.\n\n`+
-    `Échéance : `+(f.echeanceLabel||`À réception`)+`\n\n`+
+    `Veuillez trouver ci-dessous ma facture N° `+f.num+` pour la prestation de `+(f.lignes?.[0]?.desc||f.prestation||'services')+`.\n\n`+
     (f.pdfUrl ? `Consulter la facture : `+f.pdfUrl+`\n\n` : '')+
-    `N'hésitez pas à me contacter pour toute question.\n\n`+
+    `Merci d'en accuser bonne réception.\n\n`+
     `Cordialement,\n`+
     (p.nom||'');
 
@@ -1740,7 +1739,7 @@ async function sendInvoiceEmail(){
     }
 
     btn.textContent='Envoi email...';
-    const bodyWithLink = body+'\n\nConsulter la facture en ligne : '+pdfUrl;
+    const bodyWithLink = body;
     const payload={
       type: 'send_email',
       to, subject,
