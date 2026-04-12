@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Facturo — Facturation</title>
+<link rel="icon" type="image/svg+xml" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="5" y="5" width="90" height="90" fill="white" stroke="%231a2744" stroke-width="8"/><text x="50" y="62" font-family="Arial" font-size="38" font-weight="900" fill="%231a2744" text-anchor="middle">TNS</text><circle cx="50" cy="82" r="8" fill="%232e7de9"/></svg>'/>
+<title>The Next Step</title>
 <!-- AIRTABLE CONFIG -->
 <script>
 const AT = {
@@ -312,7 +313,7 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
     <div style="width:48px;height:48px;background:var(--blue-600);border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
       <svg width="24" height="24" fill="white" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
     </div>
-    <div style="font-size:22px;font-weight:700;color:white;margin-bottom:4px">Facturo</div>
+    <div style="font-size:16px;font-weight:700;color:white;margin-bottom:2px;letter-spacing:.5px">THE NEXT STEP</div><div style="font-size:10px;color:rgba(255,255,255,.5);letter-spacing:2px">CONSULTING & STRATEGY</div>
     <div style="font-size:13px;color:var(--slate-500)" id="login-sub">Entrez votre PIN pour accéder</div>
   </div>
 
@@ -384,7 +385,7 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
         <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
       </div>
       <div>
-        <div class="brand-name">Facturo</div>
+        <div class="brand-name" style="font-size:14px;letter-spacing:.3px">THE NEXT STEP</div><div style="font-size:10px;color:rgba(255,255,255,.4);letter-spacing:1.5px;margin-top:1px">CONSULTING & STRATEGY</div>
         <div class="brand-plan">Auto-entrepreneur</div>
       </div>
     </div>
@@ -414,6 +415,9 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
     </div>
     <div class="nav-item" onclick="go('telegram')">
       <div class="nav-dot"></div> Assistant & Config
+    </div>
+    <div class="nav-item" onclick="go('howto')">
+      <div class="nav-dot"></div> How to use
     </div>
   </nav>
 
@@ -738,6 +742,20 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
 
       </div>
 
+
+
+
+
+
+
+      <div style="display:flex;justify-content:flex-end">
+        <button class="btn btn-primary" onclick="saveConfig()">Enregistrer la configuration</button>
+      </div>
+    </div>
+
+    <!-- HOW TO USE -->
+    <div id="screen-howto" class="screen">
+
       <div class="form-section">
         <div class="form-section-title">Commandes reconnues par le bot</div>
         <div class="cmd-card">
@@ -783,9 +801,6 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
         </ol>
       </div>
 
-      <div style="display:flex;justify-content:flex-end">
-        <button class="btn btn-primary" onclick="saveConfig()">Enregistrer la configuration</button>
-      </div>
     </div>
 
   </div><!-- /content -->
@@ -920,7 +935,7 @@ function toast(msg,type=''){
 }
 
 // ── NAVIGATION ───────────────────────────────────────────────────────────────
-const titles={dashboard:'Tableau de bord',factures:'Factures',clients:'Clients',nouvelle:'Nouvelle facture',profil:'Mon profil',telegram:'Assistant & Config'};
+const titles={dashboard:'Tableau de bord',factures:'Factures',clients:'Clients',nouvelle:'Nouvelle facture',profil:'Mon profil',telegram:'Assistant & Config',howto:'How to use'};
 
 function go(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
