@@ -2001,8 +2001,13 @@ Tu analyses la demande et réponds UNIQUEMENT avec un JSON valide (sans markdown
 
 ACTIONS DISPONIBLES:
 
-1. Créer une facture:
+1. Créer une facture (une seule prestation):
 {"action":"create_facture","client":"NomExact","montant":500,"desc":"description prestation"}
+
+1b. Créer une facture avec plusieurs lignes de prestation:
+{"action":"create_facture","client":"NomExact","lignes":[{"desc":"Niveau 1 - Starter","qte":1,"pu":650},{"desc":"Niveau 1 - Alchimie","qte":1,"pu":650}]}
+- Utilise TOUJOURS le format lignes si plusieurs prestations sont mentionnées
+- Chaque ligne a: desc (description), qte (quantité, défaut 1), pu (prix unitaire)
 
 2. Ajouter un client:
 {"action":"create_client","nom":"Nom","email":"email@mail.fr","tel":"0600000000","adresse":"adresse"}
