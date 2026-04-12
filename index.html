@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect x='5' y='5' width='90' height='90' fill='white' stroke='%231a2744' stroke-width='8'/><text x='50' y='62' font-family='Arial' font-size='38' font-weight='900' fill='%231a2744' text-anchor='middle'>TNS</text><circle cx='50' cy='82' r='8' fill='%232e7de9'/></svg>"/>
-<title>The Next Step — Pilotage</title>
+<title>Facturo — Facturation</title>
 <!-- AIRTABLE CONFIG -->
 <script>
 const AT = {
@@ -313,7 +312,7 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
     <div style="width:48px;height:48px;background:var(--blue-600);border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
       <svg width="24" height="24" fill="white" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
     </div>
-    <div style="font-size:18px;font-weight:700;color:white;margin-bottom:4px;letter-spacing:.5px">THE NEXT STEP</div><div style="font-size:11px;color:rgba(255,255,255,.45);letter-spacing:2px">CONSULTING & STRATEGY</div>
+    <div style="font-size:22px;font-weight:700;color:white;margin-bottom:4px">Facturo</div>
     <div style="font-size:13px;color:var(--slate-500)" id="login-sub">Entrez votre PIN pour accéder</div>
   </div>
 
@@ -385,7 +384,7 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
         <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
       </div>
       <div>
-        <div class="brand-name" style="font-size:13px;font-weight:700;letter-spacing:.5px">THE NEXT STEP</div><div style="font-size:10px;color:rgba(255,255,255,.4);letter-spacing:2px;margin-top:1px">CONSULTING & STRATEGY</div>
+        <div class="brand-name">Facturo</div>
         <div class="brand-plan">Auto-entrepreneur</div>
       </div>
     </div>
@@ -406,11 +405,6 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
       <div class="nav-dot"></div> + Nouvelle facture
     </div>
 
-    <div class="nav-section">IA</div>
-    <div class="nav-item" onclick="go('ai')">
-      <div class="nav-dot"></div> Assistant IA
-    </div>
-
     <div class="nav-section">Paramètres</div>
     <div class="nav-item" onclick="go('profil')">
       <div class="nav-dot"></div> Mon profil
@@ -418,8 +412,8 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
     <div class="nav-item" onclick="go('airtable')">
       <div class="nav-dot"></div> Connexion Airtable
     </div>
-    <div class="nav-item" onclick="go('config')">
-      <div class="nav-dot"></div> Configuration
+    <div class="nav-item" onclick="go('telegram')">
+      <div class="nav-dot"></div> Assistant & Config
     </div>
   </nav>
 
@@ -508,7 +502,97 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
       </div>
 
       <!-- ASSISTANT IA dans le dashboard -->
-      
+      <div class="card" style="border-color:var(--blue-200);background:linear-gradient(135deg,#eff6ff 0%,#f8faff 100%)">
+        <div class="card-header" style="padding-bottom:10px">
+          <div class="card-title" style="color:var(--blue-700)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+            Assistant IA
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-start;padding:0 20px 16px">
+          <textarea id="ai-input" placeholder="Tapez en langage naturel... Ex: Crée une facture pour Alegria de 500€ pour du conseil SEO" style="flex:1;min-height:52px;font-size:13px;border:1px solid var(--blue-200);border-radius:var(--r);padding:10px 12px;resize:none;background:white;font-family:inherit;color:var(--slate-700)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendToAI()}"></textarea>
+          <button class="btn btn-primary" onclick="sendToAI()" style="padding:12px 14px;flex-shrink:0;background:var(--blue-600)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
+          </button>
+        </div>
+        <div id="ai-result" style="display:none;margin:0 20px 16px;padding:10px 14px;border-radius:var(--r);font-size:13px;line-height:1.6;border:1px solid var(--blue-200);background:white"></div>
+        <div style="padding:0 20px 16px;display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="quickCmd('Quelles sont mes 5 dernières factures ?')">📋 Factures récentes</button>
+          <button class="btn btn-ghost btn-sm" onclick="quickCmd('Quel est mon CA ce mois ?')">📊 CA du mois</button>
+          <button class="btn btn-ghost btn-sm" onclick="quickCmd('Liste mes clients')">👥 Clients</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Dernières factures</div>
+            <div class="card-sub">Les 5 plus récentes</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="go('factures')">Voir tout</button>
+        </div>
+        <table>
+          <thead><tr><th>N°</th><th>Client</th><th>Montant</th><th>Date</th><th>Statut</th><th></th></tr></thead>
+          <tbody id="dash-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- FACTURES -->
+    <div id="screen-factures" class="screen">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Toutes les factures</div>
+            <div class="card-sub" id="fac-count-sub">—</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary btn-sm" onclick="exportAll()">Exporter CSV</button>
+            <button class="btn btn-primary btn-sm" onclick="go('nouvelle')">+ Nouvelle</button>
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>N°</th><th>Client</th><th>Prestation</th><th>Montant</th><th>Date</th><th>Statut</th><th>Actions</th></tr></thead>
+          <tbody id="fac-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CLIENTS -->
+    <div id="screen-clients" class="screen">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Clients</div>
+            <div class="card-sub" id="cli-count-sub">—</div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openClientModal()">+ Ajouter</button>
+        </div>
+        <table>
+          <thead><tr><th>Nom</th><th>Email</th><th>Ville</th><th>Factures</th><th>CA total</th><th>Actions</th></tr></thead>
+          <tbody id="cli-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- NOUVELLE FACTURE -->
+    <div id="screen-nouvelle" class="screen">
+      <div class="form-section">
+        <div class="form-section-title">Informations facture</div>
+        <div class="grid-3">
+          <div class="field"><label class="lbl">N° de facture</label><input id="fn-num" readonly/></div>
+          <div class="field"><label class="lbl">Date d'émission</label><input id="fn-date" type="date"/></div>
+          <div class="field"><label class="lbl">Échéance</label>
+            <select id="fn-echeance">
+              <option value="reception">À réception</option>
+              <option value="15">15 jours</option>
+              <option value="30">30 jours</option>
+              <option value="45">45 jours</option>
+              <option value="60">60 jours</option>
+            </select>
+          </div>
+        </div>
+      </div>
       <div class="form-section">
         <div class="form-section-title">Client</div>
         <div class="grid-2">
@@ -621,46 +705,7 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
     </div>
 
     <!-- TELEGRAM -->
-    <!-- ÉCRAN ASSISTANT IA -->
-    <div id="screen-ai" class="screen">
-      <div style="max-width:680px;margin:0 auto;padding:8px 0">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
-          <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#6366f1);display:flex;align-items:center;justify-content:center">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
-          </div>
-          <div>
-            <div style="font-size:15px;font-weight:600;color:var(--slate-900)">Assistant IA</div>
-            <div style="font-size:12px;color:var(--slate-400)">Gérez vos factures en langage naturel</div>
-          </div>
-        </div>
-
-        <!-- Zone de messages -->
-        <div id="ai-messages" style="min-height:320px;max-height:460px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;margin-bottom:16px;padding:4px 0">
-          <div style="align-self:flex-start;background:var(--slate-50);border:1px solid var(--slate-200);border-radius:12px 12px 12px 4px;padding:12px 16px;max-width:85%;font-size:13px;color:var(--slate-700);line-height:1.5">
-            Bonjour ! Je suis votre assistant. Dites-moi ce que vous souhaitez faire :<br><br>
-            <span style="color:var(--slate-500)">• Créer une facture<br>• Ajouter un client<br>• Envoyer une facture par email<br>• Consulter votre CA</span>
-          </div>
-        </div>
-
-        <!-- Suggestions rapides -->
-        <div id="ai-suggestions" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-          <button onclick="aiSuggest('Quel est mon CA ce mois ?')" style="font-size:12px;padding:5px 10px;border:1px solid var(--slate-200);border-radius:20px;background:white;cursor:pointer;color:var(--slate-600)">📊 CA du mois</button>
-          <button onclick="aiSuggest('Liste mes dernières factures')" style="font-size:12px;padding:5px 10px;border:1px solid var(--slate-200);border-radius:20px;background:white;cursor:pointer;color:var(--slate-600)">🧾 Factures récentes</button>
-          <button onclick="aiSuggest('Liste mes clients')" style="font-size:12px;padding:5px 10px;border:1px solid var(--slate-200);border-radius:20px;background:white;cursor:pointer;color:var(--slate-600)">👥 Clients</button>
-        </div>
-
-        <!-- Zone de saisie -->
-        <div style="display:flex;gap:8px;align-items:flex-end">
-          <textarea id="ai-input-full" placeholder="Ex: Crée une facture pour Kémille, 3 prestations Niveau 1 à 650€ chacune…" style="flex:1;min-height:52px;max-height:120px;resize:none;border:1.5px solid var(--slate-200);border-radius:12px;padding:12px 14px;font-size:13px;font-family:inherit;outline:none;transition:border .15s;line-height:1.5" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage()}" onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='var(--slate-200)'"></textarea>
-          <button onclick="sendAiMessage()" style="width:44px;height:44px;border-radius:50%;background:#3b82f6;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s" onmouseover="this.style.background='#2563eb'" onmouseout="this.style.background='#3b82f6'">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
-          </button>
-        </div>
-        <div style="font-size:11px;color:var(--slate-400);margin-top:6px;text-align:center">Entrée pour envoyer · Shift+Entrée pour nouvelle ligne</div>
-      </div>
-    </div>
-
-        <div id="screen-config" class="screen">
+    <div id="screen-telegram" class="screen">
 
       <div class="form-section">
         <div class="form-section-title">Configuration Make</div>
@@ -692,6 +737,15 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
 
 
       </div>
+
+      <div class="form-section">
+        <div class="form-section-title">Commandes reconnues par le bot</div>
+        <div class="cmd-card">
+          <div class="cmd-name">Facture [client] [montant]€ [prestation]</div>
+          <div class="cmd-desc">Créer une facture immédiatement</div>
+          <div class="cmd-ex">Facture Dupont 350€ conseil SEO</div>
+          <div class="cmd-ex" style="margin-left:0;margin-top:4px">Facture SocieteABC 1200€ développement site</div>
+        </div>
         <div class="cmd-card">
           <div class="cmd-name">/liste</div>
           <div class="cmd-desc">5 dernières factures avec montants et statuts</div>
@@ -705,6 +759,34 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
           <div class="cmd-desc">Chiffre d'affaires du mois en cours</div>
         </div>
       </div>
+
+      <div class="form-section" style="border-color:var(--blue-200);background:var(--blue-50)">
+        <div class="form-section-title" style="color:var(--blue-700)">Simuler une commande Telegram</div>
+        <div style="display:flex;gap:10px;align-items:flex-end">
+          <div class="field" style="flex:1"><label class="lbl">Message</label><input id="sim-msg" value="Facture Dupont 350€ conseil SEO"/></div>
+          <button class="btn btn-primary" onclick="simulate()">Simuler</button>
+        </div>
+        <div id="sim-result" style="display:none;margin-top:12px;padding:10px 14px;border-radius:var(--r);font-size:13px;font-family:'SF Mono','Fira Code',monospace;line-height:1.6"></div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">Guide Make — 8 étapes</div>
+        <ol style="padding-left:20px;font-size:13px;color:var(--slate-600);line-height:2.2">
+          <li>Créer un nouveau scénario dans Make</li>
+          <li>Trigger : <strong style="color:var(--slate-800)">Telegram Bot → Watch Messages</strong></li>
+          <li>Créer un bot via <strong style="color:var(--slate-800)">@BotFather</strong> sur Telegram et coller le token</li>
+          <li>Ajouter un module <strong style="color:var(--slate-800)">HTTP → Make a request</strong></li>
+          <li>URL : <code style="background:var(--slate-100);padding:2px 6px;border-radius:4px;font-size:12px">VOTRE-URL/api/telegram</code> — Méthode POST</li>
+          <li>Body (JSON) : <code style="background:var(--slate-100);padding:2px 6px;border-radius:4px;font-size:12px">{"message": "{{1.message.text}}"}</code></li>
+          <li>Header : <code style="background:var(--slate-100);padding:2px 6px;border-radius:4px;font-size:12px">x-api-token: VOTRE-TOKEN</code></li>
+          <li>Réponse → <strong style="color:var(--slate-800)">Telegram → Send a Message</strong> avec le body de réponse</li>
+        </ol>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end">
+        <button class="btn btn-primary" onclick="saveConfig()">Enregistrer la configuration</button>
+      </div>
+    </div>
 
   </div><!-- /content -->
 </main>
@@ -838,7 +920,7 @@ function toast(msg,type=''){
 }
 
 // ── NAVIGATION ───────────────────────────────────────────────────────────────
-const titles={dashboard:'Tableau de bord',factures:'Factures',clients:'Clients',nouvelle:'Nouvelle facture',profil:'Mon profil',ai:'Assistant IA',config:'Configuration',airtable:'Connexion Airtable'};
+const titles={dashboard:'Tableau de bord',factures:'Factures',clients:'Clients',nouvelle:'Nouvelle facture',profil:'Mon profil',telegram:'Assistant & Config'};
 
 function go(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
@@ -847,7 +929,7 @@ function go(id){
   document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')?.includes("'"+id+"'"))n.classList.add('active')});
   document.getElementById('page-title').textContent=titles[id]||'';
   closeSidebar();
-  const renders={dashboard:renderDash,factures:renderFac,clients:renderCli,nouvelle:initNouv,profil:renderProfil,ai:renderAI,config:renderTelegram,airtable:renderAirtable};
+  const renders={dashboard:renderDash,factures:renderFac,clients:renderCli,nouvelle:initNouv,profil:renderProfil,telegram:renderTelegram};
   if(renders[id])renders[id]();
 }
 
@@ -1208,8 +1290,7 @@ function saveProfil(){
 }
 
 // ── TELEGRAM CONFIG ───────────────────────────────────────────────────────────
-function renderTelegram(){ // alias config
-
+function renderTelegram(){
   const c=getConfig();
   document.getElementById('tg-webhook').value=c.webhook||'';
   document.getElementById('tg-token').value=c.token||'';
@@ -2075,127 +2156,6 @@ RÈGLES:
     await executeAIAction(action,resEl);
   }catch(e){
     resEl.style.background='#fef2f2';resEl.style.borderColor='#fca5a5';
-    resEl.innerHTML='❌ Erreur : '+e.message;
-  }
-}
-
-function renderAI(){
-  // Rien à faire, l'écran est statique
-}
-
-function aiSuggest(text){
-  document.getElementById('ai-input-full').value = text;
-  sendAiMessage();
-}
-
-async function sendAiMessage(){
-  const input = document.getElementById('ai-input-full').value.trim();
-  if(!input) return;
-  document.getElementById('ai-input-full').value = '';
-
-  const msgs = document.getElementById('ai-messages');
-
-  // Bulle utilisateur
-  const userBubble = document.createElement('div');
-  userBubble.style.cssText = 'align-self:flex-end;background:#3b82f6;border-radius:12px 12px 4px 12px;padding:10px 14px;max-width:85%;font-size:13px;color:white;line-height:1.5';
-  userBubble.textContent = input;
-  msgs.appendChild(userBubble);
-
-  // Bulle de chargement
-  const loadBubble = document.createElement('div');
-  loadBubble.style.cssText = 'align-self:flex-start;background:var(--slate-50);border:1px solid var(--slate-200);border-radius:12px 12px 12px 4px;padding:10px 14px;max-width:85%;font-size:13px;color:var(--slate-400)';
-  loadBubble.innerHTML = '<span style="animation:pulse 1s infinite">···</span>';
-  msgs.appendChild(loadBubble);
-  msgs.scrollTop = msgs.scrollHeight;
-
-  // Appel IA (réutiliser la logique existante)
-  await callAI(input, loadBubble);
-  msgs.scrollTop = msgs.scrollHeight;
-}
-
-async function callAI(input, resEl){
-  resEl.style.display = 'block';
-  const p=getProfil();
-  const clients=getClients().map(c=>({nom:c.nom,email:c.email,id:c.id}));
-  const factures=getFactures().slice(0,10).map(f=>({num:f.num,client:f.clientNom,montant:f.total,statut:f.statut,email:f.clientEmail,atId:f.atId}));
-  const caTotal=getFactures().filter(f=>f.statut==='paid').reduce((s,f)=>s+Number(f.total),0);
-  const caMois=getFactures().filter(f=>{const d=new Date(f.date);const n=new Date();return d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear()}).reduce((s,f)=>s+Number(f.total),0);
-  const caAttente=getFactures().filter(f=>f.statut==='pending').reduce((s,f)=>s+Number(f.total),0);
-  const systemPrompt=`Tu es l'assistant IA de ${p.nom||'votre utilisateur'}, auto-entrepreneur.
-
-DONNÉES ACTUELLES:
-- Clients: ${JSON.stringify(clients)}
-- 10 dernières factures: ${JSON.stringify(factures)}
-- CA payé total: ${fmtMoney(caTotal)}
-- CA mois en cours: ${fmtMoney(caMois)}
-- CA en attente: ${fmtMoney(caAttente)}
-
-Tu analyses la demande et réponds UNIQUEMENT avec un JSON valide (sans markdown, sans texte avant ou après).
-
-ACTIONS DISPONIBLES:
-
-1. Créer une facture (une seule prestation):
-{"action":"create_facture","client":"NomExact","montant":500,"desc":"description prestation"}
-
-1b. Créer une facture avec plusieurs lignes de prestation:
-{"action":"create_facture","client":"NomExact","lignes":[{"desc":"Niveau 1 - Starter","qte":1,"pu":650},{"desc":"Niveau 1 - Alchimie","qte":1,"pu":650}]}
-- Utilise TOUJOURS le format lignes si plusieurs prestations sont mentionnées
-- Chaque ligne a: desc (description), qte (quantité, défaut 1), pu (prix unitaire)
-
-2. Ajouter un client:
-{"action":"create_client","nom":"Nom","email":"email@mail.fr","tel":"0600000000","adresse":"adresse"}
-
-3. Envoyer une facture par email:
-{"action":"send_email","facture_num":"2026-32040","to":"email@client.fr","subject":"Facture N° 2026-32040","body":"Bonjour, veuillez trouver..."}
-
-4. Marquer une facture comme payée:
-{"action":"mark_paid","facture_num":"2026-32040"}
-
-5. Informations / réponse texte:
-{"action":"info","message":"Votre CA du mois est de 1250€. Vous avez 2 factures en attente pour 600€."}
-
-RÈGLES:
-- Pour create_facture, utilise le nom exact du client tel qu'il apparaît dans la liste
-- Pour send_email, utilise l'email du client depuis la liste des factures
-- Si une info est manquante, demande-la via action info
-- Réponds TOUJOURS avec un JSON valide, jamais de texte brut
-RÈGLE ABSOLUE : Ta réponse doit commencer par { et se terminer par }. Aucun caractère avant ou après. Aucun backtick. Aucun \`\`\`json. Juste le JSON brut.`;
-
-  const cfg2=getConfig();
-  if(!cfg2.webhook){
-    resEl.style.color='var(--amber-700)';
-    resEl.innerHTML='⚠️ Configurez le webhook Make dans <strong>Configuration</strong>';
-    return;
-  }
-  try{
-    const resp=await fetch(cfg2.webhook,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({type:'ai_query',query:input,system:systemPrompt,claude_key:cfg2.claudeKey||getProfil().claudeKey||''})
-    });
-    if(!resp.ok) throw new Error('Webhook Make erreur '+resp.status);
-    const rawText = await resp.text();
-    let action=null;
-    try{
-      let clean = rawText.replace(/^```json\s*/,'').replace(/\s*```$/,'').trim();
-      let parsed = JSON.parse(clean);
-      if(typeof parsed === 'object' && parsed.body){
-        let inner = parsed.body.replace(/^```json\s*/,'').replace(/\s*```$/,'').trim();
-        action = JSON.parse(inner);
-      } else if(parsed.action){
-        action = parsed;
-      } else {
-        let txt = parsed.text||parsed.response||parsed.message||JSON.stringify(parsed);
-        txt = txt.replace(/^```json\s*/,'').replace(/\s*```$/,'').trim();
-        action = JSON.parse(txt);
-      }
-    }catch(e){
-      let txt = rawText.replace(/^```json\s*/,'').replace(/\s*```$/,'').trim();
-      action={action:'info',message:txt};
-    }
-    await executeAIAction(action, resEl);
-  }catch(e){
-    resEl.style.color='var(--red-700)';
     resEl.innerHTML='❌ Erreur : '+e.message;
   }
 }
