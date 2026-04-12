@@ -1660,14 +1660,16 @@ function quickSend(id){
 // ── ENVOI EMAIL ───────────────────────────────────────────────────────────────
 function openSendModal(){
   if(!currentFac){return;}
-  const f=currentFac;
+  const f = getFactures().find(x=>x.id===currentFac.id) || currentFac;
+  currentFac = f;
   const p=getProfil();
+  const pdfUrl = f.pdfUrl || `https://bouryludovic-lab.github.io/LudoPilotage2/factures/facture-${f.num}.pdf`;
   document.getElementById('send-to').value=f.clientEmail||'';
   document.getElementById('send-subject').value='Facture N° '+f.num+' — '+fmtMoney(f.total);
   document.getElementById('send-body').value=
     `Bonjour,\n\n`+
     `Veuillez trouver ci-dessous ma facture N° `+f.num+` pour la prestation de `+(f.lignes?.[0]?.desc||f.prestation||'services')+`.\n\n`+
-    (f.pdfUrl ? `Consulter la facture : `+f.pdfUrl+`\n\n` : '')+
+    `Consulter la facture : `+pdfUrl+`\n\n`+
     `Merci d'en accuser bonne réception.\n\n`+
     `Cordialement,\n`+
     (p.nom||'');
