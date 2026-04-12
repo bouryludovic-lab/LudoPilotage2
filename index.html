@@ -1677,7 +1677,7 @@ async function syncCoaching() {
   const el = document.getElementById('coaching-list');
   el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--slate-400);font-size:13px">Chargement...</div>';
   // Helper pour lire un champ (fields ou cellValuesByFieldId)
-  const fv = (rec, fid, def='') => rec.fields?.[fid] ?? rec.cellValuesByFieldId?.[fid] ?? def;
+  const fv = (rec, fid, def='') => rec.cellValuesByFieldId?.[fid] ?? rec.fields?.[fid] ?? def;
   try {
     const token = AT.token();
     if(!token){ el.innerHTML='<div style="padding:20px;color:var(--amber-700)">⚠️ Token Airtable manquant</div>'; return; }
@@ -1686,10 +1686,10 @@ async function syncCoaching() {
     const r = await fetch(url, {headers:{'Authorization':'Bearer '+token}});
     if(!r.ok) throw new Error('Erreur '+r.status);
     const d = await r.json();
-    // Filtrer uniquement les records de Coach Ludo (selexIxpC4Tjg82C7)
+    // Filtrer uniquement les records de Coach Ludo - Airtable retourne cellValuesByFieldId
     const allRecords = d.records||[];
     const ludoRecords = allRecords.filter(rec => {
-      const coach = rec.fields[COACHING.FIELDS.coach] || rec.cellValuesByFieldId?.[COACHING.FIELDS.coach];
+      const coach = rec.cellValuesByFieldId?.[COACHING.FIELDS.coach] || rec.fields?.[COACHING.FIELDS.coach];
       return coach?.id === 'selexIxpC4Tjg82C7' || coach?.name === 'Ludo';
     });
     coachingRecords = ludoRecords.map(rec => ({
