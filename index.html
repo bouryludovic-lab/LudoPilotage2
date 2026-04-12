@@ -1866,45 +1866,35 @@ async function generateAIResponse() {
   status.textContent = 'Claude analyse la question...';
 
   const cfg = getConfig();
-  if(!cfg.webhook){ status.textContent='⚠️ Webhook Make non configuré'; btn.disabled=false; btn.textContent='✨ Générer avec IA'; return; }
+  const claudeKey = cfg.claudeKey || '';
+  if(!claudeKey){ status.textContent='⚠️ Clé API Claude manquante dans Configuration'; btn.disabled=false; btn.textContent='✨ Générer avec IA'; return; }
 
-  // Récupérer le contexte enrichi depuis la modal (peut inclure résumé PDF)
   const promesseEnrichie = document.getElementById('cm-promesse')?.textContent || r.promesse || '';
 
-  const systemPrompt = `Tu es Ludovic Boury, coach expert en création d'infopreneuriat. Tu accompagnes des élèves dans le programme "Alchimie" pour devenir infopreneur.
-
-CONTEXTE DE L'ÉLÈVE:
-- Nom: ${r.prenom} ${r.nom}
-- Promesse/Projet: ${promesseEnrichie||r.promesse||'Non renseigné'}
-- Offre: ${r.offre||'Non renseignée'}
-
-Tu réponds à la question de l\'élève de manière personnalisée, bienveillante et actionnable. Tu utilises un ton coach — direct, encourageant, concret. Tes réponses font entre 100 et 300 mots. Tu tutoies l\'élève.
-
-Réponds UNIQUEMENT avec la réponse au format texte brut, sans JSON, sans markdown.`;
+  const systemPrompt = "Tu es Ludovic Boury, coach expert en creation d'infopreneuriat. Tu accompagnes des eleves dans le programme Alchimie pour devenir infopreneur.\n\nCONTEXTE DE L'ELEVE:\n- Nom: "+r.prenom+" "+r.nom+"\n- Promesse/Projet: "+(promesseEnrichie||r.promesse||'Non renseigne')+"\n- Offre: "+(r.offre||'Non renseignee')+"\n\nTu reponds a la question de l'eleve de maniere personnalisee, bienveillante et actionnable. Tu utilises un ton coach — direct, encourageant, concret. Tes reponses font entre 100 et 300 mots. Tu tutoies l'eleve.\n\nReponds UNIQUEMENT avec la reponse au format texte brut, sans JSON, sans markdown.";
 
   try {
-    const resp = await fetch(cfg.webhook, {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': claudeKey,
+        'anthropic-version': '2023-06-01'
+      },
       body: JSON.stringify({
-        type: 'ai_query',
-        query: r.question,
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1000,
         system: systemPrompt,
-        claude_key: cfg.claudeKey || ''
+        messages: [{role: 'user', content: r.question || 'Bonjour'}]
       })
     });
-    const rawText = await resp.text();
-    let reponse = rawText;
-    // Si c'est du JSON (format habituel), extraire le message
-    try {
-      const parsed = JSON.parse(rawText.replace(/^```json\s*/,'').replace(/\s*```$/,'').trim());
-      reponse = parsed.message || parsed.body || rawText;
-    } catch(e) { /* pas du JSON, garder tel quel */ }
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error?.message || 'Erreur API Claude '+resp.status);
+    const reponse = data.content?.[0]?.text || '';
 
     document.getElementById('cm-reponse').value = reponse;
     status.textContent = '✨ Réponse générée — modifiez si besoin avant de valider';
-    // Sauvegarder la réponse IA dans Airtable
-    await fetch(`https://api.airtable.com/v0/${COACHING.BASE}/${COACHING.TABLE}/${currentCoachingId}`, {
+    await fetch('https://api.airtable.com/v0/'+COACHING.BASE+'/'+COACHING.TABLE+'/'+currentCoachingId, {
       method: 'PATCH',
       headers: {'Authorization':'Bearer '+AT.token(),'Content-Type':'application/json'},
       body: JSON.stringify({fields:{[COACHING.FIELDS.reponseIA]: reponse}})
