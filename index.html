@@ -1676,36 +1676,41 @@ let coachingFilter = 'all';
 async function syncCoaching() {
   const el = document.getElementById('coaching-list');
   el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--slate-400);font-size:13px">Chargement...</div>';
-  // Helper pour lire un champ (fields ou cellValuesByFieldId)
-  const fv = (rec, fid, def='') => rec.cellValuesByFieldId?.[fid] ?? rec.fields?.[fid] ?? def;
   try {
     const token = AT.token();
     if(!token){ el.innerHTML='<div style="padding:20px;color:var(--amber-700)">⚠️ Token Airtable manquant</div>'; return; }
-    // Récupérer tous les records et filtrer côté JS sur Coach = Ludo (id: selexIxpC4Tjg82C7)
-    let url = `https://api.airtable.com/v0/${COACHING.BASE}/${COACHING.TABLE}?pageSize=100&sort[0][field]=Created+time&sort[0][direction]=desc`;
-    const r = await fetch(url, {headers:{'Authorization':'Bearer '+token}});
+    // Utiliser les noms de champs directement (API standard retourne dans fields{})
+    let url = `https://api.airtable.com/v0/${COACHING.BASE}/${COACHING.TABLE}?pageSize=100&sort%5B0%5D%5Bfield%5D=Created+time&sort%5B0%5D%5Bdirection%5D=desc`;
+    const r = await fetch(url, {headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'}});
     if(!r.ok) throw new Error('Erreur '+r.status);
     const d = await r.json();
-    // Filtrer uniquement les records de Coach Ludo - Airtable retourne cellValuesByFieldId
+    // L'API standard retourne dans rec.fields avec les noms de champs
     const allRecords = d.records||[];
     const ludoRecords = allRecords.filter(rec => {
-      const coach = rec.cellValuesByFieldId?.[COACHING.FIELDS.coach] || rec.fields?.[COACHING.FIELDS.coach];
-      return coach?.id === 'selexIxpC4Tjg82C7' || coach?.name === 'Ludo';
+      const f = rec.fields || {};
+      const coach = f['Coach '] || f['Coach'];
+      return coach?.name === 'Ludo' || coach === 'Ludo';
     });
-    coachingRecords = ludoRecords.map(rec => ({
+    coachingRecords = ludoRecords.map(rec => {
+      const f = rec.fields || {};
+      // Prénom/Nom via lookup
+      const prenomRaw = f['Prénom'];
+      const nomRaw = f['Nom'];
+      const prenom = Array.isArray(prenomRaw) ? prenomRaw.join(' ') : (prenomRaw||'');
+      const nom = Array.isArray(nomRaw) ? nomRaw.join(' ') : (nomRaw||'');
+      return {
       id: rec.id,
-      prenom: fv(rec, COACHING.FIELDS.prenom, []).valuesByLinkedRecordId ? Object.values(fv(rec, COACHING.FIELDS.prenom, {}).valuesByLinkedRecordId||{}).flat().join(' ') : (fv(rec, COACHING.FIELDS.prenom, [])||[]).join(' ') || '',
-      nom: fv(rec, COACHING.FIELDS.nom, []).valuesByLinkedRecordId ? Object.values(fv(rec, COACHING.FIELDS.nom, {}).valuesByLinkedRecordId||{}).flat().join(' ') : (fv(rec, COACHING.FIELDS.nom, [])||[]).join(' ') || '',
-      etat: fv(rec, COACHING.FIELDS.etat, {})?.name || 'Nouvelle soumission (a Analyser)',
-      promesse: fv(rec, COACHING.FIELDS.promesse, ''),
-      offre: fv(rec, COACHING.FIELDS.offre, ''),
-      question: fv(rec, COACHING.FIELDS.question, ''),
-      notes: fv(rec, COACHING.FIELDS.notes, ''),
-      reponseIA: fv(rec, COACHING.FIELDS.reponseIA, ''),
-      reponseFin: fv(rec, COACHING.FIELDS.reponseFin, ''),
+      prenom, nom,
+      etat: f['Etat de la demande']?.name || f['Etat de la demande'] || 'Nouvelle soumission (a Analyser)',
+      promesse: f['Promesse'] || '',
+      offre: f['Offre'] || '',
+      question: f['Question'] || '',
+      notes: f['Notes Coach'] || '',
+      reponseIA: f['Réponse IA'] || '',
+      reponseFin: f['Réponse finale'] || '',
       created: rec.createdTime || '',
-      piecesJointes: fv(rec, COACHING.FIELDS.offrePdf, []) || [],
-    }));
+      piecesJointes: f['Offre PDF'] || [],
+    }; });
     // Badge
     const newCount = coachingRecords.filter(r => r.etat === 'Nouvelle soumission (a Analyser)').length;
     const b = document.getElementById('badge-coaching');
