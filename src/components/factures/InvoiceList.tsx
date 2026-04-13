@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Trash2, Send, Eye, Download, ChevronDown } from 'lucide-react'
+import { Trash2, Send, FileText, Download, ChevronDown } from 'lucide-react'
 import { StatusBadge } from '@/components/ui/Badge'
 import { ConfirmModal } from '@/components/ui/Modal'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -12,7 +12,7 @@ import { deleteFacture, updateFactureStatut } from '@/lib/airtable'
 import { useAppStore } from '@/store'
 import type { Invoice, InvoiceStatus } from '@/lib/types'
 import { SendInvoiceModal } from './SendInvoiceModal'
-import { FileText } from 'lucide-react'
+import { PdfModal } from './PdfModal'
 
 const STATUSES: { value: InvoiceStatus | 'all'; label: string }[] = [
   { value: 'all',     label: 'Tous' },
@@ -42,6 +42,7 @@ export function InvoiceList({ loading }: InvoiceListProps) {
   const [deleteId, setDeleteId]   = useState<string | null>(null)
   const [deleting, setDeleting]   = useState(false)
   const [sendFac, setSendFac]     = useState<Invoice | null>(null)
+  const [pdfFac, setPdfFac]       = useState<Invoice | null>(null)
   const [statusOpen, setStatusOpen] = useState<string | null>(null)
 
   const filtered = factures
@@ -202,8 +203,15 @@ export function InvoiceList({ loading }: InvoiceListProps) {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1 justify-end">
                         <button
+                          onClick={() => setPdfFac(fac)}
+                          title="Aperçu PDF"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                        </button>
+                        <button
                           onClick={() => setSendFac(fac)}
-                          title="Envoyer"
+                          title="Envoyer par email"
                           className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
                         >
                           <Send className="w-3.5 h-3.5" />
@@ -249,6 +257,14 @@ export function InvoiceList({ loading }: InvoiceListProps) {
         <SendInvoiceModal
           invoice={sendFac}
           onClose={() => setSendFac(null)}
+        />
+      )}
+
+      {/* PDF modal */}
+      {pdfFac && (
+        <PdfModal
+          invoice={pdfFac}
+          onClose={() => setPdfFac(null)}
         />
       )}
     </div>

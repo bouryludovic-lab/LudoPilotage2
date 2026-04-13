@@ -18,8 +18,7 @@ export default function LoginPage() {
   const [error,     setError]     = useState('')
   const [loading,   setLoading]   = useState(false)
   // Setup fields
-  const [token,     setToken]     = useState('')
-  const [setupPin,  setSetupPin]  = useState('')
+  const [token,      setToken]      = useState('')
   const [setupError, setSetupError] = useState('')
 
   useEffect(() => {
@@ -76,10 +75,16 @@ export default function LoginPage() {
       return
     }
     setLoading(true)
-    const result = await setupAccount(token, setupPin)
+    const result = await setupAccount(token)
     setLoading(false)
     if (result.ok) {
-      router.replace('/dashboard')
+      // If a PIN exists in Airtable, show PIN screen; otherwise go to dashboard
+      const hasToken = !!localStorage.getItem('at_token')
+      if (hasToken) {
+        router.replace('/dashboard')
+      } else {
+        setScreen('pin')
+      }
     } else {
       setSetupError(result.error ?? 'Configuration échouée')
     }
