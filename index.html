@@ -1897,15 +1897,14 @@ async function generateAIResponse() {
   if(!r) return;
   const btn = document.getElementById('btn-gen-ai');
   const status = document.getElementById('cm-ai-status');
-  btn.disabled = true; btn.textContent = '⏳ Génération...';
+  btn.disabled = true; btn.textContent = '\u23f3 G\u00e9n\u00e9ration...';
 
   const cfg = getConfig();
   const claudeKey = cfg.claudeKey || '';
-  if(!claudeKey){ status.textContent='⚠️ Clé API Claude manquante dans Configuration'; btn.disabled=false; btn.textContent='✨ Générer avec IA'; return; }
+  if(!claudeKey){ status.textContent='\u26a0\ufe0f Cl\u00e9 API Claude manquante dans Configuration'; btn.disabled=false; btn.textContent='\u2728 G\u00e9n\u00e9rer avec IA'; return; }
 
   try {
-    // 1. Charger la base de connaissance Airtable
-    status.textContent = '📚 Chargement base de connaissance...';
+    status.textContent = '\ud83d\udcda Chargement base de connaissance...';
     const bcBase = 'appdpkBZRuqEWgOwB';
     const bcTable = 'tblo3ZHQ86IMEuxdp';
     const bcResp = await fetch(
@@ -1915,49 +1914,27 @@ async function generateAIResponse() {
     const bcData = await bcResp.json();
     const exemples = (bcData.records||[])
       .filter(rec => rec.fields['Actif'] && rec.fields['Contenu texte'])
-      .map(rec => '['+rec.fields['Type']+'] '+rec.fields['Titre']+'
-'+rec.fields['Contenu texte'])
-      .join('
+      .map(rec => '['+rec.fields['Type']+'] '+rec.fields['Titre']+'\n'+rec.fields['Contenu texte'])
+      .join('\n\n---\n\n');
 
----
-
-');
-
-    // 2. Construire le prompt enrichi
     const promesseEnrichie = document.getElementById('cm-promesse')?.textContent || r.promesse || '';
-    status.textContent = '🤖 Claude génère la réponse...';
+    status.textContent = '\ud83e\udd16 Claude g\u00e9n\u00e8re la r\u00e9ponse...';
 
     const systemPrompt = "Tu es Ludovic Boury, coach expert en creation d'infopreneuriat. "
-      + "Tu accompagnes des eleves dans le programme Alchimie Niveau 1 pour devenir infopreneur.
-
-"
-      + "TON STYLE DE COACHING (exemples de tes vraies reponses) :
-"
-      + exemples + "
-
-"
-      + "CONTEXTE DE L'ELEVE:
-"
-      + "- Nom: " + r.prenom + " " + r.nom + "
-"
-      + "- Promesse/Projet: " + (promesseEnrichie||r.promesse||'Non renseigne') + "
-"
-      + "- Offre: " + (r.offre||'Non renseignee') + "
-
-"
-      + "INSTRUCTIONS:
-"
-      + "- Reponds en francais, dans TON style : direct, bienveillant, concret, tu tutoies l'eleve
-"
-      + "- Commence par 'Hello [prenom]' ou 'Franchement,' ou un amorce naturelle
-"
-      + "- 100-300 mots maximum
-"
-      + "- Identifie d'abord ce qui est bien, puis ce qui peut etre ameliore avec des points concrets et actionnables
-"
+      + "Tu accompagnes des eleves dans le programme Alchimie Niveau 1 pour devenir infopreneur.\n\n"
+      + "TON STYLE DE COACHING (exemples de tes vraies reponses) :\n"
+      + exemples + "\n\n"
+      + "CONTEXTE DE L'ELEVE:\n"
+      + "- Nom: " + r.prenom + " " + r.nom + "\n"
+      + "- Promesse/Projet: " + (promesseEnrichie||r.promesse||'Non renseigne') + "\n"
+      + "- Offre: " + (r.offre||'Non renseignee') + "\n\n"
+      + "INSTRUCTIONS:\n"
+      + "- Reponds en francais, dans TON style : direct, bienveillant, concret, tu tutoies l'eleve\n"
+      + "- Commence par Hello [prenom] ou Franchement ou une amorce naturelle\n"
+      + "- 100-300 mots maximum\n"
+      + "- Identifie ce qui est bien, puis ce qui peut etre ameliore avec des points concrets\n"
       + "- Texte brut uniquement, pas de markdown ni JSON";
 
-    // 3. Appel direct à l'API Anthropic
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -1978,9 +1955,8 @@ async function generateAIResponse() {
     const reponse = data.content?.[0]?.text || '';
 
     document.getElementById('cm-reponse').value = reponse;
-    status.textContent = '✨ Réponse générée — modifiez si besoin avant de valider';
+    status.textContent = '\u2728 R\u00e9ponse g\u00e9n\u00e9r\u00e9e \u2014 modifiez si besoin avant de valider';
 
-    // 4. Sauvegarder la réponse IA dans Airtable
     await fetch('https://api.airtable.com/v0/'+COACHING.BASE+'/'+COACHING.TABLE+'/'+currentCoachingId, {
       method: 'PATCH',
       headers: {'Authorization':'Bearer '+AT.token(),'Content-Type':'application/json'},
@@ -1990,27 +1966,66 @@ async function generateAIResponse() {
     if(idx>-1) coachingRecords[idx].reponseIA = reponse;
 
   } catch(e) {
-    status.textContent = '❌ Erreur : '+e.message;
+    status.textContent = '\u274c Erreur : '+e.message;
   }
-  btn.disabled=false; btn.textContent='✨ Générer avec IA';
+  btn.disabled=false; btn.textContent='\u2728 G\u00e9n\u00e9rer avec IA';
 }
 
-function copyCoachingResponse() {
-  const reponse = document.getElementById('cm-reponse').value.trim();
-  if(!reponse){ toast('Rien à copier','error'); return; }
-  navigator.clipboard.writeText(reponse).then(()=>{
-    toast('Réponse copiée ✓ — prête à coller dans Circle','success');
-  }).catch(()=>{
-    // Fallback
-    const ta = document.createElement('textarea');
-    ta.value = reponse;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    toast('Réponse copiée ✓','success');
-  });
+async function readPdfForAI(pjIndex) {
+  const r = coachingRecords.find(x => x.id === currentCoachingId);
+  if(!r || !r.piecesJointes[pjIndex]) return;
+  const pj = r.piecesJointes[pjIndex];
+  const status = document.getElementById('cm-ai-status');
+  status.textContent = '⏳ Lecture du PDF en cours...';
+
+  try {
+    // Télécharger le PDF en base64
+    const resp = await fetch(pj.url);
+    const blob = await resp.blob();
+    const base64 = await new Promise(res => {
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result.split(',')[1]);
+      reader.readAsDataURL(blob);
+    });
+
+    // Envoyer à Claude pour extraction via l'API Anthropic directement
+    const cfg = getConfig();
+    const claudeKey = cfg.claudeKey || '';
+    if(!claudeKey){ status.textContent='⚠️ Clé API Claude manquante dans Configuration'; return; }
+
+    const apiResp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01'},
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: [
+            {type:'document', source:{type:'base64', media_type:'application/pdf', data:base64}},
+            {type:'text', text:"Résume ce document en 3-5 points clés sur la promesse et l'offre de cet élève infopreneur. Sois concis et factuel."}
+          ]
+        }]
+      })
+    });
+
+    const data = await apiResp.json();
+    const resume = data.content?.[0]?.text || 'Impossible de lire le document';
+
+    // Ajouter le résumé à la zone promesse
+    const promesseEl = document.getElementById('cm-promesse');
+    promesseEl.textContent = (promesseEl.textContent || '') + '\n\n📄 Résumé ' + pj.filename + ':\n' + resume;
+
+    // Mettre à jour le record en mémoire
+    const idx = coachingRecords.findIndex(x=>x.id===currentCoachingId);
+    if(idx>-1) coachingRecords[idx].promesse = promesseEl.textContent;
+
+    status.textContent = '✅ Document lu — cliquez "Générer avec IA" pour prendre en compte ce contexte';
+  } catch(e) {
+    status.textContent = '❌ Erreur lecture PDF : ' + e.message;
+  }
 }
+
 
 async function saveCoachingDraft() {
   const reponse = document.getElementById('cm-reponse').value.trim();
