@@ -1904,6 +1904,184 @@ async function generateAIResponse() {
   if(!claudeKey){ status.textContent='\u26a0\ufe0f Cl\u00e9 API Claude manquante dans Configuration'; btn.disabled=false; btn.textContent='\u2728 G\u00e9n\u00e9rer avec IA'; return; }
 
   try {
+    // 1. Charger la base de connaissance Airtable (textes + PDFs)
+    status.textContent = '\ud83d\udcda Chargement base de connaissance...';
+    const bcBase = 'appdpkBZRuqEWgOwB';
+    const bcTable = 'tblo3ZHQ86IMEuxdp';
+    const bcResp = await fetch(
+      'https://api.airtable.com/v0/'+bcBase+'/'+bcTable+'?fields[]=Titre&fields[]=Type&fields[]=Contenu+texte&fields[]=Fichier+PDF&fields[]=Actif&pageSize=50',
+      {headers:{'Authorization':'Bearer '+AT.token()}}
+    );
+    const bcData = await bcResp.json();
+    const records = (bcData.records||[]).filter(rec => rec.fields['Actif']);
+
+    // Textes
+    const exemples = records
+      .filter(rec => rec.fields['Contenu texte'])
+      .map(rec => '['+rec.fields['Type']+'] '+rec.fields['Titre']+'\n'+rec.fields['Contenu texte'])
+      .join('\n\n---\n\n');
+
+    // PDFs — télécharger en base64
+    status.textContent = '\ud83d\udcda Lecture des PDFs de coaching...';
+    const pdfRecords = records.filter(rec => rec.fields['Fichier PDF']?.length > 0);
+    const pdfDocs = [];
+    for(const rec of pdfRecords.slice(0,3)) { // max 3 PDFs pour rester dans les limites
+      try {
+        const pdfUrl = rec.fields['Fichier PDF'][0].url;
+        const pdfResp = await fetch(pdfUrl);
+        const blob = await pdfResp.blob();
+        const b64 = await new Promise(res => {
+          const reader = new FileReader();
+          reader.onload = () => res(reader.result.split(',')[1]);
+          reader.readAsDataURL(blob);
+        });
+        pdfDocs.push({
+          type: 'document',
+          source: {type: 'base64', media_type: 'application/pdf', data: b64},
+          title: rec.fields['Titre'] || rec.fields['Fichier PDF'][0].filename
+        });
+      } catch(e) { console.warn('PDF skip:', e.message); }
+    }
+
+    // 2. Construire le prompt
+    const question = r.question || '';
+    const offre = r.offre || '';
+    const promesseEnrichie = document.getElementById('cm-promesse')?.textContent || r.promesse || '';
+    const isOffre = offre.length > 50 || question.toLowerCase().includes('offre') || question.toLowerCase().includes('module') || question.toLowerCase().includes('programme');
+
+    status.textContent = '\ud83e\udd16 Claude g\u00e9n\u00e8re la r\u00e9ponse...';
+
+    const systemPrompt = "Tu es Ludovic Boury, coach expert en creation d'infopreneuriat. "
+      + "Tu accompagnes des eleves dans le programme Alchimie Niveau 1 pour devenir infopreneur.\n\n"
+      + "PROGRAMME ALCHIMIE :\n"
+      + "- NIVEAU 1 : definir sa PROMESSE (qui j'aide + transformation + delai), puis construire son OFFRE sur papier (modules, exercices, objectifs, resultats par etape).\n"
+      + "- PASSAGE AU NIVEAU 2 : quand l'offre est complete et structuree pour passer a la mise en oeuvre reelle.\n"
+      + "- PROMESSE validee : cible claire, transformation concrete, delai 90j, sans frein. Format : J'aide [cible] a [transformation] en [delai], sans [frein].\n"
+      + "- OFFRE validee : 3-5 modules avec objectif/contenu/exercices/resultat, fil conducteur, moment pivot, format clair, prix.\n\n"
+      + "TON STYLE (exemples de tes vraies reponses) :\n"
+      + exemples + "\n\n"
+      + "CONTEXTE DE L'ELEVE :\n"
+      + "- Nom : " + r.prenom + " " + r.nom + "\n"
+      + "- Type : " + (isOffre ? 'OFFRE' : 'PROMESSE') + "\n"
+      + "- Promesse/Projet : " + promesseEnrichie + "\n"
+      + "- Offre soumise : " + offre + "\n\n"
+      + "INSTRUCTIONS :\n"
+      + (isOffre
+        ? "C'est une OFFRE. 1) Reconnais ce qui est bien. 2) Identifie ce qui manque precisement. 3) Donne actions concretes. 4) Valide pour Niveau 2 si complete, sinon dis exactement ce qui manque.\n"
+        : "C'est une PROMESSE. 1) Reconnais ce qui est bien. 2) Identifie ce qui manque (flou, delai, desirabilite, formel). 3) Donne 2-3 exemples reformules. 4) Valide si bonne, sinon demande retravail.\n"
+      )
+      + "Commence par Hello [prenom] ou Franchement,. Direct, bienveillant, 100-300 mots, texte brut.";
+
+    // 3. Construire les messages avec PDFs si disponibles
+    const userContent = [];
+    for(const pdf of pdfDocs){
+      userContent.push(pdf);
+    }
+    userContent.push({type:'text', text: question || 'Analyse ma soumission.'});
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': claudeKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: [{role: 'user', content: userContent}]
+      })
+    });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error?.message || 'Erreur API Claude '+resp.status);
+    const reponse = data.content?.[0]?.text || '';
+
+    document.getElementById('cm-reponse').value = reponse;
+    status.textContent = '\u2728 R\u00e9ponse g\u00e9n\u00e9r\u00e9e avec ' + records.length + ' ressources de la base de connaissance';
+
+    await fetch('https://api.airtable.com/v0/'+COACHING.BASE+'/'+COACHING.TABLE+'/'+currentCoachingId, {
+      method: 'PATCH',
+      headers: {'Authorization':'Bearer '+AT.token(),'Content-Type':'application/json'},
+      body: JSON.stringify({fields:{[COACHING.FIELDS.reponseIA]: reponse}})
+    });
+    const idx = coachingRecords.findIndex(x=>x.id===currentCoachingId);
+    if(idx>-1) coachingRecords[idx].reponseIA = reponse;
+
+  } catch(e) {
+    status.textContent = '\u274c Erreur : '+e.message;
+  }
+  btn.disabled=false; btn.textContent='\u2728 G\u00e9n\u00e9rer avec IA';
+}
+
+async function readPdfForAI(pjIndex) {
+  const r = coachingRecords.find(x => x.id === currentCoachingId);
+  if(!r || !r.piecesJointes[pjIndex]) return;
+  const pj = r.piecesJointes[pjIndex];
+  const status = document.getElementById('cm-ai-status');
+  status.textContent = '⏳ Lecture du PDF en cours...';
+
+  try {
+    // Télécharger le PDF en base64
+    const resp = await fetch(pj.url);
+    const blob = await resp.blob();
+    const base64 = await new Promise(res => {
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result.split(',')[1]);
+      reader.readAsDataURL(blob);
+    });
+
+    // Envoyer à Claude pour extraction via l'API Anthropic directement
+    const cfg = getConfig();
+    const claudeKey = cfg.claudeKey || '';
+    if(!claudeKey){ status.textContent='⚠️ Clé API Claude manquante dans Configuration'; return; }
+
+    const apiResp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01'},
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: [
+            {type:'document', source:{type:'base64', media_type:'application/pdf', data:base64}},
+            {type:'text', text:"Résume ce document en 3-5 points clés sur la promesse et l'offre de cet élève infopreneur. Sois concis et factuel."}
+          ]
+        }]
+      })
+    });
+
+    const data = await apiResp.json();
+    const resume = data.content?.[0]?.text || 'Impossible de lire le document';
+
+    // Ajouter le résumé à la zone promesse
+    const promesseEl = document.getElementById('cm-promesse');
+    promesseEl.textContent = (promesseEl.textContent || '') + '\n\n📄 Résumé ' + pj.filename + ':\n' + resume;
+
+    // Mettre à jour le record en mémoire
+    const idx = coachingRecords.findIndex(x=>x.id===currentCoachingId);
+    if(idx>-1) coachingRecords[idx].promesse = promesseEl.textContent;
+
+    status.textContent = '✅ Document lu — cliquez "Générer avec IA" pour prendre en compte ce contexte';
+  } catch(e) {
+    status.textContent = '❌ Erreur lecture PDF : ' + e.message;
+  }
+}
+
+async function generateAIResponse() {
+  const r = coachingRecords.find(x => x.id === currentCoachingId);
+  if(!r) return;
+  const btn = document.getElementById('btn-gen-ai');
+  const status = document.getElementById('cm-ai-status');
+  btn.disabled = true; btn.textContent = '\u23f3 G\u00e9n\u00e9ration...';
+
+  const cfg = getConfig();
+  const claudeKey = cfg.claudeKey || '';
+  if(!claudeKey){ status.textContent='\u26a0\ufe0f Cl\u00e9 API Claude manquante dans Configuration'; btn.disabled=false; btn.textContent='\u2728 G\u00e9n\u00e9rer avec IA'; return; }
+
+  try {
     status.textContent = '\ud83d\udcda Chargement base de connaissance...';
     const bcBase = 'appdpkBZRuqEWgOwB';
     const bcTable = 'tblo3ZHQ86IMEuxdp';
@@ -1920,19 +2098,48 @@ async function generateAIResponse() {
     const promesseEnrichie = document.getElementById('cm-promesse')?.textContent || r.promesse || '';
     status.textContent = '\ud83e\udd16 Claude g\u00e9n\u00e8re la r\u00e9ponse...';
 
+    // Détecter si c'est une promesse ou une offre
+    const question = r.question || '';
+    const offre = r.offre || '';
+    const promesse = promesseEnrichie || r.promesse || '';
+    const isOffre = offre.length > 50 || question.toLowerCase().includes('offre') || question.toLowerCase().includes('module') || question.toLowerCase().includes('programme');
+    const isPromesse = !isOffre || question.toLowerCase().includes('promesse');
+
+    const contexteType = isOffre ? 'OFFRE' : 'PROMESSE';
+
     const systemPrompt = "Tu es Ludovic Boury, coach expert en creation d'infopreneuriat. "
       + "Tu accompagnes des eleves dans le programme Alchimie Niveau 1 pour devenir infopreneur.\n\n"
-      + "TON STYLE DE COACHING (exemples de tes vraies reponses) :\n"
+      + "PROGRAMME ALCHIMIE - CE QUE TU DOIS SAVOIR :\n"
+      + "- NIVEAU 1 : L'eleve doit d'abord definir sa PROMESSE (qui j'aide + transformation + delai), puis construire son OFFRE sur papier (modules, exercices, objectifs, resultats par etape).\n"
+      + "- PASSAGE AU NIVEAU 2 : L'offre est validee quand elle est assez complete et structuree pour passer a la mise en oeuvre reelle (creation des modules videos, creation de contenu, vente).\n"
+      + "- Une PROMESSE est validee quand : cible claire, transformation concrete et desirable, delai (90 jours ideal), sans frein principal. Format : J'aide [cible] a [transformation] en [delai], sans [frein].\n"
+      + "- Une OFFRE est validee quand : 3-5 modules max avec objectif/contenu/exercices/resultat par module, fil conducteur visible, moment pivot (declic), format clair, prix coherent.\n\n"
+      + "TON STYLE DE COACHING (exemples de tes vraies reponses - imite ce style exactement) :\n"
       + exemples + "\n\n"
-      + "CONTEXTE DE L'ELEVE:\n"
-      + "- Nom: " + r.prenom + " " + r.nom + "\n"
-      + "- Promesse/Projet: " + (promesseEnrichie||r.promesse||'Non renseigne') + "\n"
-      + "- Offre: " + (r.offre||'Non renseignee') + "\n\n"
-      + "INSTRUCTIONS:\n"
-      + "- Reponds en francais, dans TON style : direct, bienveillant, concret, tu tutoies l'eleve\n"
-      + "- Commence par Hello [prenom] ou Franchement ou une amorce naturelle\n"
+      + "CONTEXTE DE L'ELEVE :\n"
+      + "- Nom : " + r.prenom + " " + r.nom + "\n"
+      + "- Type de soumission : " + contexteType + "\n"
+      + "- Promesse/Projet : " + promesse + "\n"
+      + "- Offre soumise : " + offre + "\n\n"
+      + "INSTRUCTIONS SELON LE TYPE :\n"
+      + (isOffre
+        ? "C'est une OFFRE. Tu dois :\n"
+          + "1. Commencer par reconnaitre ce qui est bien et solide\n"
+          + "2. Identifier precisement ce qui manque ou peut etre ameliore (modules pas assez detailles, pas de resultats par etape, pas de moment pivot, redondances, etc.)\n"
+          + "3. Donner des actions concretes et specifiques pour l'ameliorer\n"
+          + "4. Si l'offre est suffisamment complete et structuree, VALIDER pour le Niveau 2 en le disant clairement (Je te valide pour le niveau 2)\n"
+          + "5. Si pas encore pret pour le niveau 2, dire exactement ce qui manque pour y arriver\n"
+        : "C'est une PROMESSE. Tu dois :\n"
+          + "1. Reconnaitre ce qui est bien (cible, douleur, transformation)\n"
+          + "2. Identifier precisement ce qui manque (trop flou, pas de delai, pas de desirabilite, trop formel, trop long)\n"
+          + "3. Donner 2-3 exemples concrets de formulations ameliorees\n"
+          + "4. Si la promesse est claire, ciblee et desirable, la valider et inviter l'eleve a construire son offre\n"
+          + "5. Si pas encore validee, dire exactement ce qu'il faut retravailler et attendre une nouvelle proposition\n"
+      )
+      + "\nSTYLE OBLIGATOIRE :\n"
+      + "- Commence par Hello [prenom] ou Franchement,\n"
+      + "- Direct, bienveillant, tu tutoies l'eleve\n"
       + "- 100-300 mots maximum\n"
-      + "- Identifie ce qui est bien, puis ce qui peut etre ameliore avec des points concrets\n"
       + "- Texte brut uniquement, pas de markdown ni JSON";
 
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
