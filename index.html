@@ -813,7 +813,8 @@ label.lbl{font-size:12px;font-weight:500;color:var(--slate-600)}
         </div>
         <div class="modal-foot">
           <button class="btn btn-secondary" onclick="closeModal('modal-coaching')">Annuler</button>
-          <button class="btn" style="background:#f59e0b;color:white;border:none" onclick="saveCoachingDraft()">💾 Sauvegarder brouillon</button>
+          <button class="btn" style="background:#6366f1;color:white;border:none" onclick="copyCoachingResponse()">📋 Copier</button>
+          <button class="btn" style="background:#f59e0b;color:white;border:none" onclick="saveCoachingDraft()">💾 Sauvegarder</button>
           <button class="btn btn-primary" style="background:#059669" onclick="validateCoachingResponse()">✅ Valider & marquer traitée</button>
         </div>
       </div>
@@ -1897,26 +1898,76 @@ async function generateAIResponse() {
   const btn = document.getElementById('btn-gen-ai');
   const status = document.getElementById('cm-ai-status');
   btn.disabled = true; btn.textContent = '⏳ Génération...';
-  status.textContent = 'Claude analyse la question...';
 
   const cfg = getConfig();
   const claudeKey = cfg.claudeKey || '';
   if(!claudeKey){ status.textContent='⚠️ Clé API Claude manquante dans Configuration'; btn.disabled=false; btn.textContent='✨ Générer avec IA'; return; }
 
-  const promesseEnrichie = document.getElementById('cm-promesse')?.textContent || r.promesse || '';
-
-  const systemPrompt = "Tu es Ludovic Boury, coach expert en creation d'infopreneuriat. Tu accompagnes des eleves dans le programme Alchimie pour devenir infopreneur.\n\nCONTEXTE DE L'ELEVE:\n- Nom: "+r.prenom+" "+r.nom+"\n- Promesse/Projet: "+(promesseEnrichie||r.promesse||'Non renseigne')+"\n- Offre: "+(r.offre||'Non renseignee')+"\n\nTu reponds a la question de l'eleve de maniere personnalisee, bienveillante et actionnable. Tu utilises un ton coach — direct, encourageant, concret. Tes reponses font entre 100 et 300 mots. Tu tutoies l'eleve.\n\nReponds UNIQUEMENT avec la reponse au format texte brut, sans JSON, sans markdown.";
-
   try {
+    // 1. Charger la base de connaissance Airtable
+    status.textContent = '📚 Chargement base de connaissance...';
+    const bcBase = 'appdpkBZRuqEWgOwB';
+    const bcTable = 'tblo3ZHQ86IMEuxdp';
+    const bcResp = await fetch(
+      'https://api.airtable.com/v0/'+bcBase+'/'+bcTable+'?fields[]=Titre&fields[]=Type&fields[]=Contenu+texte&fields[]=Actif&pageSize=50',
+      {headers:{'Authorization':'Bearer '+AT.token()}}
+    );
+    const bcData = await bcResp.json();
+    const exemples = (bcData.records||[])
+      .filter(rec => rec.fields['Actif'] && rec.fields['Contenu texte'])
+      .map(rec => '['+rec.fields['Type']+'] '+rec.fields['Titre']+'
+'+rec.fields['Contenu texte'])
+      .join('
+
+---
+
+');
+
+    // 2. Construire le prompt enrichi
+    const promesseEnrichie = document.getElementById('cm-promesse')?.textContent || r.promesse || '';
+    status.textContent = '🤖 Claude génère la réponse...';
+
+    const systemPrompt = "Tu es Ludovic Boury, coach expert en creation d'infopreneuriat. "
+      + "Tu accompagnes des eleves dans le programme Alchimie Niveau 1 pour devenir infopreneur.
+
+"
+      + "TON STYLE DE COACHING (exemples de tes vraies reponses) :
+"
+      + exemples + "
+
+"
+      + "CONTEXTE DE L'ELEVE:
+"
+      + "- Nom: " + r.prenom + " " + r.nom + "
+"
+      + "- Promesse/Projet: " + (promesseEnrichie||r.promesse||'Non renseigne') + "
+"
+      + "- Offre: " + (r.offre||'Non renseignee') + "
+
+"
+      + "INSTRUCTIONS:
+"
+      + "- Reponds en francais, dans TON style : direct, bienveillant, concret, tu tutoies l'eleve
+"
+      + "- Commence par 'Hello [prenom]' ou 'Franchement,' ou un amorce naturelle
+"
+      + "- 100-300 mots maximum
+"
+      + "- Identifie d'abord ce qui est bien, puis ce qui peut etre ameliore avec des points concrets et actionnables
+"
+      + "- Texte brut uniquement, pas de markdown ni JSON";
+
+    // 3. Appel direct à l'API Anthropic
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': claudeKey,
-        'anthropic-version': '2023-06-01'
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-sonnet-4-5',
         max_tokens: 1000,
         system: systemPrompt,
         messages: [{role: 'user', content: r.question || 'Bonjour'}]
@@ -1928,6 +1979,8 @@ async function generateAIResponse() {
 
     document.getElementById('cm-reponse').value = reponse;
     status.textContent = '✨ Réponse générée — modifiez si besoin avant de valider';
+
+    // 4. Sauvegarder la réponse IA dans Airtable
     await fetch('https://api.airtable.com/v0/'+COACHING.BASE+'/'+COACHING.TABLE+'/'+currentCoachingId, {
       method: 'PATCH',
       headers: {'Authorization':'Bearer '+AT.token(),'Content-Type':'application/json'},
@@ -1935,10 +1988,28 @@ async function generateAIResponse() {
     });
     const idx = coachingRecords.findIndex(x=>x.id===currentCoachingId);
     if(idx>-1) coachingRecords[idx].reponseIA = reponse;
+
   } catch(e) {
     status.textContent = '❌ Erreur : '+e.message;
   }
   btn.disabled=false; btn.textContent='✨ Générer avec IA';
+}
+
+function copyCoachingResponse() {
+  const reponse = document.getElementById('cm-reponse').value.trim();
+  if(!reponse){ toast('Rien à copier','error'); return; }
+  navigator.clipboard.writeText(reponse).then(()=>{
+    toast('Réponse copiée ✓ — prête à coller dans Circle','success');
+  }).catch(()=>{
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = reponse;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('Réponse copiée ✓','success');
+  });
 }
 
 async function saveCoachingDraft() {
