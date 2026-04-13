@@ -1706,6 +1706,7 @@ const COACHING = {
 
 let coachingRecords = [];
 let currentCoachingId = null;
+let knowledgeBaseCache = null; // Cache base de connaissance
 let coachingFilter = 'all';
 
 async function syncCoaching() {
@@ -1756,7 +1757,55 @@ async function syncCoaching() {
   }
 }
 
-function renderCoaching() { syncCoaching(); }
+function renderCoaching() {
+  // Précharger la base de connaissance en arrière-plan si pas encore fait
+  if(!knowledgeBaseCache) loadKnowledgeBase();
+  syncCoaching();
+}
+
+async function loadKnowledgeBase() {
+  try {
+    const bcBase = 'appdpkBZRuqEWgOwB';
+    const bcTable = 'tblo3ZHQ86IMEuxdp';
+    const bcResp = await fetch(
+      'https://api.airtable.com/v0/'+bcBase+'/'+bcTable+'?fields[]=Titre&fields[]=Type&fields[]=Contenu+texte&fields[]=Fichier+PDF&fields[]=Actif&pageSize=50',
+      {headers:{'Authorization':'Bearer '+AT.token()}}
+    );
+    const bcData = await bcResp.json();
+    const records = (bcData.records||[]).filter(rec => rec.fields['Actif']);
+
+    // Textes
+    const exemples = records
+      .filter(rec => rec.fields['Contenu texte'])
+      .map(rec => '['+rec.fields['Type']+'] '+rec.fields['Titre']+'\n'+rec.fields['Contenu texte'])
+      .join('\n\n---\n\n');
+
+    // PDFs en parallèle (max 3)
+    const pdfRecords = records.filter(rec => rec.fields['Fichier PDF']?.length > 0).slice(0,3);
+    const pdfDocs = await Promise.all(pdfRecords.map(async rec => {
+      try {
+        const pdfUrl = rec.fields['Fichier PDF'][0].url;
+        const pdfResp = await fetch(pdfUrl);
+        const blob = await pdfResp.blob();
+        const b64 = await new Promise(res => {
+          const reader = new FileReader();
+          reader.onload = () => res(reader.result.split(',')[1]);
+          reader.readAsDataURL(blob);
+        });
+        return {type:'document', source:{type:'base64', media_type:'application/pdf', data:b64}, title: rec.fields['Titre']};
+      } catch(e) { return null; }
+    }));
+
+    knowledgeBaseCache = {
+      exemples,
+      pdfDocs: pdfDocs.filter(Boolean),
+      count: records.length
+    };
+    console.log('Base de connaissance chargée:', knowledgeBaseCache.count, 'ressources,', knowledgeBaseCache.pdfDocs.length, 'PDFs');
+  } catch(e) {
+    console.warn('Erreur chargement base de connaissance:', e.message);
+  }
+}
 
 function filterCoaching(f) {
   coachingFilter = f;
@@ -1909,44 +1958,14 @@ async function generateAIResponse() {
   if(!claudeKey){ status.textContent='\u26a0\ufe0f Cl\u00e9 API Claude manquante dans Configuration'; btn.disabled=false; btn.textContent='\u2728 G\u00e9n\u00e9rer avec IA'; return; }
 
   try {
-    // 1. Charger la base de connaissance Airtable (textes + PDFs)
-    status.textContent = '\ud83d\udcda Chargement base de connaissance...';
-    const bcBase = 'appdpkBZRuqEWgOwB';
-    const bcTable = 'tblo3ZHQ86IMEuxdp';
-    const bcResp = await fetch(
-      'https://api.airtable.com/v0/'+bcBase+'/'+bcTable+'?fields[]=Titre&fields[]=Type&fields[]=Contenu+texte&fields[]=Fichier+PDF&fields[]=Actif&pageSize=50',
-      {headers:{'Authorization':'Bearer '+AT.token()}}
-    );
-    const bcData = await bcResp.json();
-    const records = (bcData.records||[]).filter(rec => rec.fields['Actif']);
-
-    // Textes
-    const exemples = records
-      .filter(rec => rec.fields['Contenu texte'])
-      .map(rec => '['+rec.fields['Type']+'] '+rec.fields['Titre']+'\n'+rec.fields['Contenu texte'])
-      .join('\n\n---\n\n');
-
-    // PDFs — télécharger en base64
-    status.textContent = '\ud83d\udcda Lecture des PDFs de coaching...';
-    const pdfRecords = records.filter(rec => rec.fields['Fichier PDF']?.length > 0);
-    const pdfDocs = [];
-    for(const rec of pdfRecords.slice(0,3)) { // max 3 PDFs pour rester dans les limites
-      try {
-        const pdfUrl = rec.fields['Fichier PDF'][0].url;
-        const pdfResp = await fetch(pdfUrl);
-        const blob = await pdfResp.blob();
-        const b64 = await new Promise(res => {
-          const reader = new FileReader();
-          reader.onload = () => res(reader.result.split(',')[1]);
-          reader.readAsDataURL(blob);
-        });
-        pdfDocs.push({
-          type: 'document',
-          source: {type: 'base64', media_type: 'application/pdf', data: b64},
-          title: rec.fields['Titre'] || rec.fields['Fichier PDF'][0].filename
-        });
-      } catch(e) { console.warn('PDF skip:', e.message); }
+    // 1. Utiliser le cache base de connaissance (chargé au démarrage)
+    if(!knowledgeBaseCache) {
+      status.textContent = '\ud83d\udcda Chargement base de connaissance...';
+      await loadKnowledgeBase();
     }
+    const exemples = knowledgeBaseCache?.exemples || '';
+    const pdfDocs = knowledgeBaseCache?.pdfDocs || [];
+    status.textContent = '\ud83e\udd16 Claude génère la réponse...';
 
     // 2. Construire le prompt
     const question = r.question || '';
@@ -1954,7 +1973,7 @@ async function generateAIResponse() {
     const promesseEnrichie = document.getElementById('cm-promesse')?.textContent || r.promesse || '';
     // Détection intelligente : si des PDFs sont joints ou contenu long = offre, sinon promesse
     const contenuTotal = (offre + promesseEnrichie + question).toLowerCase();
-    const isOffre = pdfDocs.length > 0
+    const isOffre = (r.piecesJointes && r.piecesJointes.length > 0)
       || offre.length > 100
       || contenuTotal.includes('module')
       || contenuTotal.includes('programme')
@@ -1975,7 +1994,7 @@ async function generateAIResponse() {
       + "CONTEXTE :\n"
       + "- Eleve : " + r.prenom + " " + r.nom + "\n"
       + "- Type soumission : " + (isOffre ? 'OFFRE (analyse les PDFs joints)' : 'PROMESSE') + "\n"
-      + "- Contenu texte : " + promesseEnrichie.substring(0, 500) + "\n\n"
+      + "- Contenu texte : " + promesseEnrichie + "\n\n"
       + "REGLE ABSOLUE DE FORMAT :\n"
       + "- MAXIMUM 150 mots, pas un de plus\n"
       + "- Texte continu, ZERO liste a puces, ZERO titres en gras\n"
@@ -1987,12 +2006,31 @@ async function generateAIResponse() {
         : "PROMESSE : Evalue cible/transformation/delai/desirabilite. Donne 1-2 exemples reformules si besoin. Valide ou demande retravail.\n"
       );
 
-    // 3. Construire les messages avec PDFs si disponibles
+    // 3. Construire les messages — PDFs de l'élève EN PRIORITÉ + question
     const userContent = [];
-    for(const pdf of pdfDocs){
-      userContent.push(pdf);
+
+    // Télécharger les PDFs joints par l'élève (promesse/offre soumise)
+    if(r.piecesJointes && r.piecesJointes.length > 0) {
+      status.textContent = '📄 Lecture des PDFs de l\'élève...';
+      const eleveePdfs = await Promise.all(
+        r.piecesJointes.filter(pj => pj.type === 'application/pdf').slice(0,3).map(async pj => {
+          try {
+            const resp = await fetch(pj.url);
+            const blob = await resp.blob();
+            const b64 = await new Promise(res => {
+              const reader = new FileReader();
+              reader.onload = () => res(reader.result.split(',')[1]);
+              reader.readAsDataURL(blob);
+            });
+            return {type:'document', source:{type:'base64', media_type:'application/pdf', data:b64}, title: pj.filename};
+          } catch(e) { return null; }
+        })
+      );
+      eleveePdfs.filter(Boolean).forEach(pdf => userContent.push(pdf));
     }
+
     userContent.push({type:'text', text: question || 'Analyse ma soumission.'});
+    status.textContent = '🤖 Claude génère la réponse...';
 
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
