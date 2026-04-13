@@ -1835,6 +1835,11 @@ function openCoaching(id) {
     pjSection.style.display = 'none';
   }
   openModal('modal-coaching');
+
+  // Auto-générer si pas encore de réponse IA
+  if(!r.reponseIA && !r.reponseFin && r.question) {
+    setTimeout(() => generateAIResponse(), 300);
+  }
 }
 
 async function readPdfForAI(pjIndex) {
@@ -1869,7 +1874,7 @@ async function readPdfForAI(pjIndex) {
           role: 'user',
           content: [
             {type:'document', source:{type:'base64', media_type:'application/pdf', data:base64}},
-            {type:'text', text:"Résume ce document en 3-5 points clés sur la promesse et l'offre de cet élève infopreneur. Sois concis et factuel."}
+            {type:'text', text:"Retranscris intégralement tout le contenu de ce document, mot pour mot, sans rien omettre ni résumer. Je veux le texte complet."}
           ]
         }]
       })
