@@ -217,6 +217,7 @@ tbody tr:hover td{background:var(--slate-50)}
 .badge-paid{background:var(--green-50);color:var(--green-700)}.badge-paid::before{background:var(--green-500)}
 .badge-pending{background:var(--amber-50);color:var(--amber-700)}.badge-pending::before{background:var(--amber-500)}
 .badge-sent{background:#eff6ff;color:#1d4ed8}.badge-sent::before{background:#3b82f6}
+.badge-error{background:#fef2f2;color:#b91c1c}.badge-error::before{background:#ef4444}
 .badge-draft{background:var(--slate-100);color:var(--slate-500)}.badge-draft::before{background:var(--slate-400)}
 
 /* ── FORMS ── */
@@ -1029,13 +1030,14 @@ function closeModal(id){document.getElementById(id).classList.remove('open')}
 // ── DASHBOARD ────────────────────────────────────────────────────────────────
 function renderDash(){
   const F=getFactures(),C=getClients();
-  const ca=F.reduce((s,f)=>s+Number(f.total),0);
-  const pending=F.filter(f=>f.statut==='pending');
+  const ca=F.filter(f=>f.statut!=='error').reduce((s,f)=>s+Number(f.total),0);
+  const F_valid=F.filter(f=>f.statut!=='error');
+  const pending=F_valid.filter(f=>f.statut==='pending'||f.statut==='sent');
   const pendingAmt=pending.reduce((s,f)=>s+Number(f.total),0);
   document.getElementById('s-ca').textContent=ca>0?fmtMoney(ca):'0,00 €';
   document.getElementById('s-ca-meta').textContent=`dont ${fmtMoney(pendingAmt)} en attente`;
   document.getElementById('s-total').textContent=F.length;
-  document.getElementById('s-total-meta').textContent=F.filter(f=>f.statut==='paid').length+' payées';
+  document.getElementById('s-total-meta').textContent=F_valid.filter(f=>f.statut==='paid').length+' payées';
   document.getElementById('s-pending').textContent=pending.length;
   document.getElementById('s-clients').textContent=C.length;
   // Badge
@@ -1054,13 +1056,45 @@ function renderDash(){
     <td class="td-primary">${esc(f.clientNom)}</td>
     <td style="font-weight:600;color:var(--blue-600)">${fmtMoney(f.total)}</td>
     <td class="td-muted">${fmtDate(f.date)}</td>
-    <td>${badge(f.statut, f.dateEnvoi)}</td>
+    <td>${badge(f.statut, f.dateEnvoi, f.id)}</td>
     <td><button class="btn btn-ghost btn-sm" onclick="openPdf('${f.id}')">PDF</button>
     <button class="btn btn-sm" style="background:#059669;color:white;border:none" onclick="quickSend('${f.id}')">✉</button></td>
   </tr>`).join('');
 }
 
-function badge(s,dateEnvoi){const m={paid:'Payée',pending:'En attente',sent:'Envoyée',draft:'Brouillon'};const label=m[s]||s;const extra=s==='sent'&&dateEnvoi?` <span style="font-size:10px;opacity:.7">${dateEnvoi}</span>`:'';return`<span class="badge badge-${s}">${label}</span>${extra}`;}
+function badge(s, dateEnvoi, facId){
+  const m={paid:'Payée',pending:'En attente',sent:'Envoyée',error:'Erreur',draft:'Brouillon'};
+  const label=m[s]||s;
+  const extra=s==='sent'&&dateEnvoi?` <span style="font-size:10px;opacity:.7">${dateEnvoi}</span>`:'';
+  if(facId){
+    const opts=['pending','sent','paid','error'].map(v=>`<div onclick="changeStatut('${facId}','${v}');event.stopPropagation()" style="padding:6px 12px;font-size:12px;cursor:pointer;border-radius:5px;white-space:nowrap" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''">${badge(m[v]||v)}</div>`).join('');
+    return `<div style="position:relative;display:inline-block">
+      <span class="badge badge-${s}" style="cursor:pointer" onclick="event.stopPropagation();toggleStatutMenu('${facId}')">${label}${extra} ▾</span>
+      <div id="sm-${facId}" style="display:none;position:absolute;top:110%;left:0;z-index:200;background:white;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);padding:4px;min-width:130px">${opts}</div>
+    </div>`;
+  }
+  return `<span class="badge badge-${s}">${label}${extra}</span>`;
+}
+
+function toggleStatutMenu(id){
+  document.querySelectorAll('[id^="sm-"]').forEach(el=>{if(el.id!=='sm-'+id)el.style.display='none';});
+  const el=document.getElementById('sm-'+id);
+  if(el) el.style.display=el.style.display==='none'?'block':'none';
+}
+document.addEventListener('click',()=>document.querySelectorAll('[id^="sm-"]').forEach(el=>el.style.display='none'));
+
+async function changeStatut(id, newStatut){
+  const F=getFactures(),f=F.find(x=>x.id===id);
+  if(!f) return;
+  const atValMap={paid:'Payée',pending:'En attente',sent:'Envoyée',error:'Erreur'};
+  f.statut=newStatut;
+  S.set('factures',F);
+  renderFac();renderDash();
+  if(f.atId&&AT.token()){
+    await AT.update(AT.TABLES.factures,f.atId,{[AT.FIELDS.factures.statut]:atValMap[newStatut]||'En attente'});
+  }
+  toast('Statut : '+atValMap[newStatut],'success');
+}
 
 // ── FACTURES ─────────────────────────────────────────────────────────────────
 function renderFac(){
@@ -1074,7 +1108,7 @@ function renderFac(){
     <td class="td-muted">${esc((f.lignes&&f.lignes[0]?.desc)||'—')}</td>
     <td style="font-weight:600;color:var(--blue-600)">${fmtMoney(f.total)}</td>
     <td class="td-muted">${fmtDate(f.date)}</td>
-    <td>${badge(f.statut, f.dateEnvoi)}</td>
+    <td>${badge(f.statut, f.dateEnvoi, f.id)}</td>
     <td><div class="td-actions">
       <button class="btn btn-ghost btn-sm" onclick="openPdf('${f.id}')">PDF</button>
       <button class="btn btn-sm" style="background:#059669;color:white;border:none;padding:5px 8px" onclick="quickSend('${f.id}')">✉</button>
@@ -1490,7 +1524,7 @@ async function syncFactures(){
       num:f['Numéro']||'',clientNom:f['Client']||'',
       total:f['Montant (€)']||0,date:f["Date d'émission"]||'',
       echeanceLabel:f['Échéance']||'',
-      statut:statut==='Payée'?'paid':statut==='En retard'?'overdue':(f['Email envoyé ✓']||f['Email envoyé'])?'sent':'pending',
+      statut:statut==='Payée'?'paid':statut==='Envoyée'?'sent':statut==='Erreur'||statut==='Erreur '?'error':statut==='En retard'?'overdue':'pending',
       dateEnvoi:f['Date envoi']||'',
       lignes:[{desc:f['Prestation']||'',qte:1,pu:f['Montant (€)']||0}],
       paiement:f['Mode de paiement']||'',clientEmail:f['Email client']||'',
