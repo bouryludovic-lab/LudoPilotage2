@@ -1,0 +1,64 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply text-slate-800 bg-slate-50;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-slate-300 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-slate-400; }
+}
+
+@layer components {
+  /* Progress bar for page transitions */
+  .progress-bar {
+    height: 3px;
+    @apply bg-blue-600;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 9999;
+    transition: width 0.3s ease;
+  }
+
+  /* Table defaults */
+  table { @apply w-full border-collapse; }
+
+  /* PIN button */
+  .pin-btn {
+    @apply bg-slate-800 text-white border border-slate-700 rounded-xl p-4 text-lg font-medium
+           cursor-pointer font-sans transition-all duration-100 select-none
+           hover:bg-slate-700 active:scale-95;
+  }
+
+  /* Shimmer skeleton */
+  .skeleton {
+    background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite linear;
+    @apply rounded;
+  }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
