@@ -1952,30 +1952,40 @@ async function generateAIResponse() {
     const question = r.question || '';
     const offre = r.offre || '';
     const promesseEnrichie = document.getElementById('cm-promesse')?.textContent || r.promesse || '';
-    const isOffre = offre.length > 50 || question.toLowerCase().includes('offre') || question.toLowerCase().includes('module') || question.toLowerCase().includes('programme');
+    // Détection intelligente : si des PDFs sont joints ou contenu long = offre, sinon promesse
+    const contenuTotal = (offre + promesseEnrichie + question).toLowerCase();
+    const isOffre = pdfDocs.length > 0
+      || offre.length > 100
+      || contenuTotal.includes('module')
+      || contenuTotal.includes('programme')
+      || contenuTotal.includes('formation')
+      || contenuTotal.includes('niveau')
+      || contenuTotal.includes('exercice');
 
     status.textContent = '\ud83e\udd16 Claude g\u00e9n\u00e8re la r\u00e9ponse...';
 
     const systemPrompt = "Tu es Ludovic Boury, coach expert en creation d'infopreneuriat. "
-      + "Tu accompagnes des eleves dans le programme Alchimie Niveau 1 pour devenir infopreneur.\n\n"
+      + "Tu accompagnes des eleves dans le programme Alchimie Niveau 1.\n\n"
       + "PROGRAMME ALCHIMIE :\n"
-      + "- NIVEAU 1 : definir sa PROMESSE (qui j'aide + transformation + delai), puis construire son OFFRE sur papier (modules, exercices, objectifs, resultats par etape).\n"
-      + "- PASSAGE AU NIVEAU 2 : quand l'offre est complete et structuree pour passer a la mise en oeuvre reelle.\n"
-      + "- PROMESSE validee : cible claire, transformation concrete, delai 90j, sans frein. Format : J'aide [cible] a [transformation] en [delai], sans [frein].\n"
-      + "- OFFRE validee : 3-5 modules avec objectif/contenu/exercices/resultat, fil conducteur, moment pivot, format clair, prix.\n\n"
-      + "TON STYLE (exemples de tes vraies reponses) :\n"
+      + "- NIVEAU 1 : PROMESSE d'abord, puis OFFRE sur papier (modules, exercices, resultats).\n"
+      + "- PASSAGE AU NIVEAU 2 : offre complete avec modules detailles, parcours clair, prix.\n"
+      + "- Si PDFs joints : ils contiennent l'offre ou promesse de l'eleve. Analyse leur contenu.\n\n"
+      + "TON STYLE (imite exactement ces exemples) :\n"
       + exemples + "\n\n"
-      + "CONTEXTE DE L'ELEVE :\n"
-      + "- Nom : " + r.prenom + " " + r.nom + "\n"
-      + "- Type : " + (isOffre ? 'OFFRE' : 'PROMESSE') + "\n"
-      + "- Promesse/Projet : " + promesseEnrichie + "\n"
-      + "- Offre soumise : " + offre + "\n\n"
-      + "INSTRUCTIONS :\n"
+      + "CONTEXTE :\n"
+      + "- Eleve : " + r.prenom + " " + r.nom + "\n"
+      + "- Type soumission : " + (isOffre ? 'OFFRE (analyse les PDFs joints)' : 'PROMESSE') + "\n"
+      + "- Contenu texte : " + promesseEnrichie.substring(0, 500) + "\n\n"
+      + "REGLE ABSOLUE DE FORMAT :\n"
+      + "- MAXIMUM 150 mots, pas un de plus\n"
+      + "- Texte continu, ZERO liste a puces, ZERO titres en gras\n"
+      + "- Commence par Hello " + r.prenom + " ou Franchement,\n"
+      + "- Ton direct, bienveillant, tu tutoies\n\n"
+      + "INSTRUCTIONS SELON LE TYPE :\n"
       + (isOffre
-        ? "C'est une OFFRE. 1) Reconnais ce qui est bien. 2) Identifie ce qui manque precisement. 3) Donne actions concretes. 4) Valide pour Niveau 2 si complete, sinon dis exactement ce qui manque.\n"
-        : "C'est une PROMESSE. 1) Reconnais ce qui est bien. 2) Identifie ce qui manque (flou, delai, desirabilite, formel). 3) Donne 2-3 exemples reformules. 4) Valide si bonne, sinon demande retravail.\n"
-      )
-      + "Commence par Hello [prenom] ou Franchement,. Direct, bienveillant, 100-300 mots, texte brut.";
+        ? "OFFRE : Lis les PDFs joints. Evalue si modules detailles (objectif/contenu/exercices/resultat), fil conducteur clair, moment pivot, format et prix. Si tout est la, valide clairement pour le Niveau 2. Sinon dis exactement ce qui manque en 2-3 points max.\n"
+        : "PROMESSE : Evalue cible/transformation/delai/desirabilite. Donne 1-2 exemples reformules si besoin. Valide ou demande retravail.\n"
+      );
 
     // 3. Construire les messages avec PDFs si disponibles
     const userContent = [];
@@ -1994,7 +2004,7 @@ async function generateAIResponse() {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-5',
-        max_tokens: 1000,
+        max_tokens: 500,
         system: systemPrompt,
         messages: [{role: 'user', content: userContent}]
       })
