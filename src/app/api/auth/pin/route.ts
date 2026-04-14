@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getProfil } from '@/lib/airtable-new'
 
 /**
  * PIN login against new profils table.
@@ -21,7 +20,8 @@ export async function POST(req: NextRequest) {
 
     // Fetch all profils, find matching PIN
     const { AT_BASE, AT_TABLES, AT_FIELDS } = await import('@/lib/types')
-    const url = `https://api.airtable.com/v0/${AT_BASE}/${AT_TABLES.profils}?pageSize=100`
+    // returnFieldsByFieldId=true because old table uses field IDs
+    const url = `https://api.airtable.com/v0/${AT_BASE}/${AT_TABLES.profils}?pageSize=100&returnFieldsByFieldId=true`
     const r = await fetch(url, {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     })
@@ -46,8 +46,6 @@ export async function POST(req: NextRequest) {
           tel:     String(rec.fields[AT_FIELDS.profils.tel]     ?? ''),
           iban:    String(rec.fields[AT_FIELDS.profils.iban]    ?? ''),
           prefix:  String(rec.fields[AT_FIELDS.profils.prefix]  ?? 'F-'),
-          webhook: rec.fields[AT_FIELDS.profils.webhook]    ? String(rec.fields[AT_FIELDS.profils.webhook])    : undefined,
-          ghToken: rec.fields[AT_FIELDS.profils.gh_token]   ? String(rec.fields[AT_FIELDS.profils.gh_token])   : undefined,
         }
         return NextResponse.json({ ok: true, userEmail, profil })
       }

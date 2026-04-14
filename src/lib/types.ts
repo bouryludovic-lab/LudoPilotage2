@@ -133,70 +133,74 @@ export interface ChatMessage {
   timestamp: string
 }
 
-// ─── Airtable Config ─────────────────────────────────────────────────────────
+// ─── Airtable Config ──────────────────────────────────────────────────────────
 
 export const AT_BASE = 'appdpkBZRuqEWgOwB'
 
-// New tables (fresh, use field names)
+// Core tables: OLD IDs (existing data + field IDs)
+// New tables: NEW IDs (new features, use field names)
 export const AT_TABLES = {
-  profils:      'tblxiuLqflhdTdW6n',
-  factures:     'tbl23gpQ2ypeXRymQ',
-  clients:      'tblMJYQpS4iqz9MJt',
+  // ── existing tables with real data ──
+  profils:      'tblrBTOVI4Vtyw7Yu',   // old profil table
+  factures:     'tblg4GSn4VYEWym7U',   // old factures table
+  clients:      'tblhyDbRE9EsehF8P',   // old clients table
+  // ── new tables for new modules ──
   hub_messages: 'tblYMMsyFXwRh9m6T',
   coaching:     'tblmpUCHUkQXhbypC',
 } as const
 
-// Field names for new tables (no field ID mapping needed)
+// Field IDs for existing tables (returnFieldsByFieldId=true)
+// Field names for new tables (no returnFieldsByFieldId)
 export const AT_FIELDS = {
-  profils: {
-    nom:       'Name',
-    email:     'email',
-    siret:     'siret',
-    adresse:   'adresse',
-    tel:       'tel',
-    iban:      'iban',
-    prefix:    'prefix',
-    pin:       'pin',
-    webhook:   'webhook',
-    gh_token:  'gh_token',
-    claude_key:'claude_key',
-  },
   factures: {
-    num:         'Name',
-    client_nom:  'client_nom',
-    client_email:'client_email',
-    montant:     'montant',
-    date:        'date',
-    echeance:    'echeance',
-    statut:      'statut',
-    prestation:  'prestation',
-    paiement:    'paiement',
-    notes:       'notes',
-    email_envoye:'email_envoye',
-    date_envoi:  'date_envoi',
-    pdf_url:     'pdf_url',
-    user_email:  'user_email',
+    num:         'fldfWxfpMbfDx8C4r',
+    client_nom:  'fldNfyOjAR0l0J26A',   // was "client"
+    client_email:'fld5HBQXkvPuCuy0S',   // was "email"
+    montant:     'fldcDOmXjgv5lcxUu',
+    date:        'fldLKwukDFcqDTBcN',
+    echeance:    'fldjDzETRbstPdDqG',
+    statut:      'fld0dmKRy5LF17l8G',
+    prestation:  'fldqN7CRQPzspMWjl',
+    paiement:    'fldO41dH1Y4Z7Nf5E',
+    notes:       'fldJphY2HZEcLyU8U',
+    email_envoye:'fldQQFX8GjgST3GoH',
+    date_envoi:  'fldRrEv5qZuSRKNQG',
+    pdf:        'fld0STwue4xaMjOwX',
+    pdf_url:    'fldWERkkMOXVg6efx',
   },
   clients: {
-    nom:       'Name',
-    email:     'email',
-    tel:       'tel',
-    adresse:   'adresse',
-    siret:     'siret',
-    notes:     'notes',
-    user_email:'user_email',
+    nom:     'fldKAzAwGwPPtAmR0',
+    email:   'fld8N9FpM3QlyXBxI',
+    tel:     'fldklBTwFzp1G5CE5',
+    adresse: 'fldOGf87J5w3nYIQ5',
+    siret:   'fldxzOntFLchVyIJb',
+    ca:      'fldhTrfiVkr2uImEN',
+    notes:   'fldjKYVeJC6gnlRIb',
   },
+  profils: {
+    nom:     'fldNgVkNEOVtWfFdZ',
+    siret:   'fld2zcuPKXeIDnrYJ',
+    adresse: 'fld1NSImbC9MhFlwr',
+    email:   'fld7WhHvhrRDHeJ75',
+    tel:     'fldthrvLySFe5e5CR',
+    iban:    'fldWeehG4d2TibX1p',
+    prefix:  'fld7qz7VqdYpdjcVf',
+    pin:     'fldlA797JhQZDCWPb',
+    token:   'fldWDPsM4ssVgaq2e',
+    logo:    'fldLOGO00000000001',
+  },
+  // New tables use field names (no field IDs)
   hub_messages: {
-    name:           'Name',
-    source:         'source',
-    author:         'author',
-    content:        'content',
-    date:           'date',
-    priority:       'priority',
-    read:           'read',
-    tags:           'tags',
-    user_email:     'user_email',
-    action_required:'action_required',
+    name:            'Name',
+    source:          'source',
+    author:          'author',
+    content:         'content',
+    date:            'date',
+    priority:        'priority',
+    read:            'read',
+    tags:            'tags',
+    user_email:      'user_email',
+    action_required: 'action_required',
   },
   coaching: {
     student_name:  'Name',

@@ -8,7 +8,7 @@ import { storage } from '@/lib/storage'
 import {
   LayoutDashboard, FileText, Users, MessageSquare,
   Bot, ClipboardList, GraduationCap, Settings,
-  LogOut, Zap,
+  LogOut, Zap, User,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { href: '/agent',         icon: Bot,              label: 'Agent IA',      group: 'tools', isNew: true },
   { href: '/formulaires',   icon: ClipboardList,    label: 'Formulaires',   group: 'tools' },
   { href: '/coaching',      icon: GraduationCap,    label: 'Coaching',      group: 'tools' },
+  { href: '/profil',        icon: User,             label: 'Mon profil',    group: 'bottom' },
   { href: '/configuration', icon: Settings,         label: 'Configuration', group: 'bottom' },
 ]
 

@@ -5,18 +5,16 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { Upload, LogOut } from 'lucide-react'
+import { Upload, Trash2, User, Building2, CreditCard, Zap } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
-import { Input, Textarea } from '@/components/ui/Input'
+import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { useAppStore } from '@/store'
 import { updateProfilInAirtable } from '@/lib/airtable'
-import { storage } from '@/lib/storage'
-import { useRouter } from 'next/navigation'
 
 const schema = z.object({
   nom:     z.string().min(1, 'Nom requis'),
-  siret:   z.string().refine(v => !v || /^\d{14}$/.test(v.replace(/\s/g, '')), 'SIRET invalide'),
+  siret:   z.string().refine(v => !v || /^\d{14}$/.test(v.replace(/\s/g, '')), 'SIRET invalide (14 chiffres)').or(z.literal('')),
   adresse: z.string(),
   email:   z.string().email('Email invalide').or(z.literal('')),
   tel:     z.string(),
@@ -28,15 +26,11 @@ type FormData = z.infer<typeof schema>
 
 export default function ProfilPage() {
   const { profil, setProfil } = useAppStore()
-  const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
-  const [logo, setLogo] = useState(profil.logo ?? '')
+  const [logo, setLogo]     = useState(profil.logo ?? '')
   const [saving, setSaving] = useState(false)
 
-  const {
-    register, handleSubmit, reset,
-    formState: { errors, isDirty },
-  } = useForm<FormData>({
+  const { register, handleSubmit, reset, formState: { errors, isDirty } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       nom: profil.nom, siret: profil.siret, adresse: profil.adresse,
@@ -50,7 +44,7 @@ export default function ProfilPage() {
       email: profil.email, tel: profil.tel, iban: profil.iban, prefix: profil.prefix,
     })
     setLogo(profil.logo ?? '')
-  }, [profil, reset])
+  }, [profil.atId])
 
   function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -75,69 +69,119 @@ export default function ProfilPage() {
     }
   }
 
-  function handleLogout() {
-    storage.logout()
-    router.replace('/login')
-  }
-
   return (
-    <AppLayout title="Mon profil" subtitle="Informations de votre entreprise">
-      <div className="max-w-2xl mx-auto space-y-4">
+    <AppLayout title="Mon profil" subtitle="Informations de ton entreprise">
+      <div className="max-w-2xl space-y-4">
 
         {/* Logo */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-card">
-          <h2 className="text-sm font-semibold text-slate-700 mb-4 pb-3 border-b border-slate-100">Logo de l'entreprise</h2>
-          <div className="flex items-center gap-4">
-            <div className="w-20 h-20 rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center bg-slate-50 overflow-hidden flex-shrink-0">
+        <Section icon={Building2} title="Logo de l'entreprise">
+          <div className="flex items-center gap-5">
+            <div
+              className="w-24 h-24 rounded-2xl flex items-center justify-center overflow-hidden flex-shrink-0"
+              style={{
+                background: logo ? 'transparent' : 'rgba(124,58,237,0.08)',
+                border: `2px dashed ${logo ? 'rgba(124,58,237,0.3)' : 'rgba(255,255,255,0.1)'}`,
+              }}
+            >
               {logo
                 ? <img src={logo} alt="Logo" className="w-full h-full object-contain" />
-                : <span className="text-xs text-slate-400 text-center px-2">Pas de logo</span>
+                : <Building2 className="w-8 h-8" style={{ color: 'rgba(255,255,255,0.2)' }} />
               }
             </div>
-            <div>
+            <div className="space-y-2">
               <Button variant="secondary" size="sm" onClick={() => fileRef.current?.click()}>
-                <Upload className="w-3.5 h-3.5" /> Choisir un fichier
+                <Upload className="w-3.5 h-3.5" />
+                {logo ? 'Changer le logo' : 'Importer un logo'}
               </Button>
               {logo && (
-                <button onClick={() => setLogo('')} className="block mt-2 text-xs text-red-500 hover:underline">
-                  Supprimer le logo
-                </button>
+                <Button variant="danger" size="sm" onClick={() => setLogo('')}>
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Supprimer
+                </Button>
               )}
-              <p className="text-xs text-slate-400 mt-1">PNG, JPG — max 500 Ko</p>
+              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.25)' }}>PNG, JPG — max 500 Ko. Apparaît sur les factures PDF.</p>
             </div>
             <input ref={fileRef} type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
           </div>
-        </div>
+        </Section>
 
-        {/* Company info */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-card">
-          <h2 className="text-sm font-semibold text-slate-700 mb-4 pb-3 border-b border-slate-100">Informations entreprise</h2>
-          <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
-            <Input label="Raison sociale" required error={errors.nom?.message} {...register('nom')} />
+        {/* Entreprise */}
+        <Section icon={Building2} title="Informations entreprise">
+          <div className="space-y-4">
+            <Input label="Raison sociale / Nom" required error={errors.nom?.message} {...register('nom')} />
             <div className="grid grid-cols-2 gap-3">
               <Input label="SIRET" placeholder="12345678901234" error={errors.siret?.message} {...register('siret')} />
-              <Input label="Préfixe factures" placeholder="F-" hint="Ex: TNS-, F-, 2025-" error={errors.prefix?.message} {...register('prefix')} />
+              <Input label="Préfixe factures" placeholder="F-" hint="Ex: F-, TNS-, 2025-" error={errors.prefix?.message} {...register('prefix')} />
             </div>
-            <Input label="Adresse" {...register('adresse')} />
-            <div className="grid grid-cols-2 gap-3">
-              <Input label="Email" type="email" error={errors.email?.message} {...register('email')} />
-              <Input label="Téléphone" type="tel" {...register('tel')} />
-            </div>
-            <Input label="IBAN" placeholder="FR76 XXXX XXXX XXXX XXXX XXXX XXX" hint="Apparaît sur les factures" {...register('iban')} />
-          </form>
-        </div>
+            <Input label="Adresse complète" placeholder="123 rue de la Paix, 75001 Paris" {...register('adresse')} />
+          </div>
+        </Section>
+
+        {/* Contact */}
+        <Section icon={User} title="Contact">
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Email" type="email" placeholder="contact@monentreprise.fr" error={errors.email?.message} {...register('email')} />
+            <Input label="Téléphone" type="tel" placeholder="+33 6 00 00 00 00" {...register('tel')} />
+          </div>
+        </Section>
+
+        {/* IBAN */}
+        <Section icon={CreditCard} title="IBAN (paiements)">
+          <Input
+            label="IBAN"
+            placeholder="FR76 XXXX XXXX XXXX XXXX XXXX XXX"
+            hint="Apparaît sur tes factures pour le virement"
+            {...register('iban')}
+          />
+        </Section>
 
         {/* Actions */}
-        <div className="flex items-center justify-between">
-          <Button variant="danger" onClick={handleLogout}>
-            <LogOut className="w-3.5 h-3.5" /> Se déconnecter
-          </Button>
-          <Button variant="primary" onClick={handleSubmit(onSubmit)} loading={saving}>
+        <div className="flex justify-end gap-3">
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={handleSubmit(onSubmit)}
+            loading={saving}
+          >
+            <Zap className="w-4 h-4" />
             Enregistrer le profil
           </Button>
         </div>
 
+        {/* Status */}
+        {!profil.atId && (
+          <div className="rounded-2xl p-4 flex items-start gap-3"
+            style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)' }}>
+            <Zap className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#FCD34D' }} />
+            <div>
+              <p className="text-xs font-semibold mb-0.5" style={{ color: '#FCD34D' }}>Synchronisation requise</p>
+              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                Les données Airtable ne sont pas encore chargées. Lance une synchronisation depuis le dashboard ou clique sur l'icône ↻ en haut à droite.
+              </p>
+            </div>
+          </div>
+        )}
+
       </div>
     </AppLayout>
+  )
+}
+
+function Section({ icon: Icon, title, children }: {
+  icon: React.ComponentType<{ className?: string }>
+  title: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="flex items-center gap-2.5 mb-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ background: 'rgba(124,58,237,0.12)' }}>
+          <Icon className="w-3.5 h-3.5 text-violet-400" />
+        </div>
+        <h2 className="text-sm font-bold text-white/80">{title}</h2>
+      </div>
+      {children}
+    </div>
   )
 }

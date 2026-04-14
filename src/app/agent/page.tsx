@@ -66,41 +66,34 @@ export default function AgentPage() {
     setSending(true)
 
     try {
-      const claudeKey = typeof window !== 'undefined'
-        ? JSON.parse(localStorage.getItem('config') ?? '{}')?.claudeKey ?? ''
-        : ''
-
-      if (!claudeKey) {
-        // Simulated response
-        await new Promise(r => setTimeout(r, 1000))
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: 'Pour activer l\'IA, configure ta clé Claude API dans Configuration. En attendant, je suis en mode démo.',
-          timestamp: new Date().toISOString(),
-        }])
-        setSending(false)
-        return
-      }
-
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      // Use server-side proxy — ANTHROPIC_API_KEY stays in Vercel env
+      const resp = await fetch('/api/claude', {
         method: 'POST',
-        headers: {
-          'x-api-key': claudeKey,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: selected.model,
-          max_tokens: 1024,
-          system: selected.systemPrompt,
+          maxTokens: 1024,
+          systemPrompt: selected.systemPrompt,
           messages: [...messages, userMsg]
             .filter(m => m.role === 'user' || m.role === 'assistant')
             .map(m => ({ role: m.role, content: m.content })),
         }),
       })
       const data = await resp.json()
-      const text = data.content?.[0]?.text ?? 'Erreur de réponse.'
-      setMessages(prev => [...prev, { role: 'assistant', content: text, timestamp: new Date().toISOString() }])
+      if (!resp.ok) {
+        const errMsg = data.error ?? 'Erreur IA'
+        const isUnconfigured = errMsg.includes('ANTHROPIC_API_KEY')
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: isUnconfigured
+            ? "La clé API Claude n'est pas configurée. Ajoute `ANTHROPIC_API_KEY` dans les variables d'environnement Vercel."
+            : `Erreur: ${errMsg}`,
+          timestamp: new Date().toISOString(),
+        }])
+        setSending(false)
+        return
+      }
+      setMessages(prev => [...prev, { role: 'assistant', content: data.text, timestamp: new Date().toISOString() }])
     } catch {
       toast.error('Erreur lors de la communication avec Claude')
     } finally {
