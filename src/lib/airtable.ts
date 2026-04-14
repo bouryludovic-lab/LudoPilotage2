@@ -20,7 +20,7 @@ async function getAll(table: string): Promise<Array<{ id: string; fields: Record
   let offset: string | null = null
 
   do {
-    const u: string = url(table) + '?pageSize=100' + (offset ? '&offset=' + offset : '')
+    const u: string = url(table) + '?pageSize=100&returnFieldsByFieldId=true' + (offset ? '&offset=' + offset : '')
     const r = await fetch(u, { headers: headers() })
     if (!r.ok) throw new Error(`Airtable ${r.status}: ${r.statusText}`)
     const d = await r.json()
