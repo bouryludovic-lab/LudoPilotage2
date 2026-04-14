@@ -12,8 +12,8 @@ export interface Invoice {
   id: string
   atId?: string
   num: string
-  date: string           // ISO date string
-  echeance: string       // ISO date string
+  date: string
+  echeance: string
   echeanceLabel: string
   clientId: string
   clientNom: string
@@ -29,6 +29,7 @@ export interface Invoice {
   dateEnvoi?: string
   pdfUrl?: string
   emailEnvoye?: boolean
+  userEmail?: string
 }
 
 export interface Client {
@@ -40,6 +41,7 @@ export interface Client {
   adresse: string
   siret: string
   notes?: string
+  userEmail?: string
 }
 
 export interface Profil {
@@ -51,7 +53,11 @@ export interface Profil {
   tel: string
   iban: string
   prefix: string
-  logo?: string  // base64 data URL
+  logo?: string
+  pin?: string
+  webhook?: string
+  ghToken?: string
+  claudeKey?: string
 }
 
 export interface Config {
@@ -61,55 +67,146 @@ export interface Config {
   ghToken?: string
 }
 
-// ─── Airtable Field Maps ─────────────────────────────────────────────────────
+// ─── New SaaS Models ─────────────────────────────────────────────────────────
+
+export type HubSource = 'circle' | 'slack' | 'whatsapp' | 'email' | 'notion'
+export type HubPriority = 'high' | 'medium' | 'low'
+
+export interface HubMessage {
+  id: string
+  source: HubSource
+  author: string
+  content: string
+  date: string
+  priority: HubPriority
+  read: boolean
+  tags: string[]
+  actionRequired?: boolean
+  userEmail?: string
+}
+
+export interface AIAgent {
+  id: string
+  name: string
+  description: string
+  systemPrompt: string
+  model: string
+  active: boolean
+  createdAt: string
+  conversations?: number
+}
+
+export interface FormField {
+  id: string
+  type: 'text' | 'textarea' | 'number' | 'select' | 'checkbox' | 'date' | 'email'
+  label: string
+  placeholder?: string
+  required?: boolean
+  options?: string[]
+}
+
+export interface FormTemplate {
+  id: string
+  name: string
+  description: string
+  fields: FormField[]
+  createdAt: string
+  submissions?: number
+}
+
+export interface CoachingSession {
+  id: string
+  atId?: string
+  studentName: string
+  studentEmail: string
+  topic: string
+  date: string
+  status: 'scheduled' | 'completed' | 'cancelled'
+  notes?: string
+  aiSummary?: string
+  userEmail?: string
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: string
+}
+
+// ─── Airtable Config ─────────────────────────────────────────────────────────
 
 export const AT_BASE = 'appdpkBZRuqEWgOwB'
 
+// New tables (fresh, use field names)
 export const AT_TABLES = {
-  factures: 'tblg4GSn4VYEWym7U',
-  clients:  'tblhyDbRE9EsehF8P',
-  profil:   'tblrBTOVI4Vtyw7Yu',
+  profils:      'tblxiuLqflhdTdW6n',
+  factures:     'tbl23gpQ2ypeXRymQ',
+  clients:      'tblMJYQpS4iqz9MJt',
+  hub_messages: 'tblYMMsyFXwRh9m6T',
+  coaching:     'tblmpUCHUkQXhbypC',
 } as const
 
+// Field names for new tables (no field ID mapping needed)
 export const AT_FIELDS = {
+  profils: {
+    nom:       'Name',
+    email:     'email',
+    siret:     'siret',
+    adresse:   'adresse',
+    tel:       'tel',
+    iban:      'iban',
+    prefix:    'prefix',
+    pin:       'pin',
+    webhook:   'webhook',
+    gh_token:  'gh_token',
+    claude_key:'claude_key',
+  },
   factures: {
-    num:        'fldfWxfpMbfDx8C4r',
-    client:     'fldNfyOjAR0l0J26A',
-    lienClient: 'fldtEKdVOZBsxg8DF',
-    montant:    'fldcDOmXjgv5lcxUu',
-    date:       'fldLKwukDFcqDTBcN',
-    echeance:   'fldjDzETRbstPdDqG',
-    statut:     'fld0dmKRy5LF17l8G',
-    prestation: 'fldqN7CRQPzspMWjl',
-    paiement:   'fldO41dH1Y4Z7Nf5E',
-    email:      'fld5HBQXkvPuCuy0S',
-    notes:      'fldJphY2HZEcLyU8U',
-    emailEnvoye:'fldQQFX8GjgST3GoH',
-    dateEnvoi:  'fldRrEv5qZuSRKNQG',
-    pdf:        'fld0STwue4xaMjOwX',
-    pdfUrl:     'fldWERkkMOXVg6efx',
+    num:         'Name',
+    client_nom:  'client_nom',
+    client_email:'client_email',
+    montant:     'montant',
+    date:        'date',
+    echeance:    'echeance',
+    statut:      'statut',
+    prestation:  'prestation',
+    paiement:    'paiement',
+    notes:       'notes',
+    email_envoye:'email_envoye',
+    date_envoi:  'date_envoi',
+    pdf_url:     'pdf_url',
+    user_email:  'user_email',
   },
   clients: {
-    nom:     'fldKAzAwGwPPtAmR0',
-    email:   'fld8N9FpM3QlyXBxI',
-    tel:     'fldklBTwFzp1G5CE5',
-    adresse: 'fldOGf87J5w3nYIQ5',
-    siret:   'fldxzOntFLchVyIJb',
-    ca:      'fldhTrfiVkr2uImEN',
-    notes:   'fldjKYVeJC6gnlRIb',
+    nom:       'Name',
+    email:     'email',
+    tel:       'tel',
+    adresse:   'adresse',
+    siret:     'siret',
+    notes:     'notes',
+    user_email:'user_email',
   },
-  profil: {
-    cle:     'fldZAYBVDqd6ygtDZ',
-    nom:     'fldNgVkNEOVtWfFdZ',
-    siret:   'fld2zcuPKXeIDnrYJ',
-    adresse: 'fld1NSImbC9MhFlwr',
-    email:   'fld7WhHvhrRDHeJ75',
-    tel:     'fldthrvLySFe5e5CR',
-    iban:    'fldWeehG4d2TibX1p',
-    prefix:  'fld7qz7VqdYpdjcVf',
-    pin:     'fldlA797JhQZDCWPb',
-    token:   'fldWDPsM4ssVgaq2e',
-    logo:    'fldLOGO00000000001',
+  hub_messages: {
+    name:           'Name',
+    source:         'source',
+    author:         'author',
+    content:        'content',
+    date:           'date',
+    priority:       'priority',
+    read:           'read',
+    tags:           'tags',
+    user_email:     'user_email',
+    action_required:'action_required',
+  },
+  coaching: {
+    student_name:  'Name',
+    student_email: 'student_email',
+    topic:         'topic',
+    date:          'date',
+    status:        'status',
+    notes:         'notes',
+    ai_summary:    'ai_summary',
+    user_email:    'user_email',
   },
 } as const
 

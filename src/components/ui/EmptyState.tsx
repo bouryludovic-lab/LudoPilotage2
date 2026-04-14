@@ -1,4 +1,5 @@
 import { type LucideIcon } from 'lucide-react'
+import { Button } from './Button'
 
 interface EmptyStateProps {
   icon: LucideIcon
@@ -9,19 +10,19 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-      <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-4">
-        <Icon className="w-5 h-5 text-slate-400" />
+    <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+      <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+        style={{ background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.2)' }}>
+        <Icon className="w-6 h-6 text-violet-400" />
       </div>
-      <p className="text-sm font-semibold text-slate-500 mb-1">{title}</p>
-      {description && <p className="text-xs text-slate-400 max-w-xs">{description}</p>}
+      <p className="text-sm font-semibold text-white/60 mb-1.5">{title}</p>
+      {description && <p className="text-xs text-white/30 max-w-xs leading-relaxed">{description}</p>}
       {action && (
-        <button
-          onClick={action.onClick}
-          className="mt-4 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-        >
-          {action.label}
-        </button>
+        <div className="mt-5">
+          <Button variant="outline" size="sm" onClick={action.onClick}>
+            {action.label}
+          </Button>
+        </div>
       )}
     </div>
   )

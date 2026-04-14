@@ -6,16 +6,19 @@ interface SpinnerProps {
   size?: 'sm' | 'md' | 'lg'
 }
 
-const SIZES = { sm: 'w-4 h-4', md: 'w-6 h-6', lg: 'w-8 h-8' }
+const SIZES = { sm: 'w-4 h-4', md: 'w-5 h-5', lg: 'w-8 h-8' }
 
 export function Spinner({ className, size = 'md' }: SpinnerProps) {
-  return <Loader2 className={cn('animate-spin text-slate-400', SIZES[size], className)} />
+  return <Loader2 className={cn('animate-spin text-violet-400', SIZES[size], className)} />
 }
 
 export function FullPageSpinner() {
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-white/70 backdrop-blur-sm z-40">
-      <Spinner size="lg" className="text-blue-600" />
+    <div className="fixed inset-0 flex items-center justify-center z-40" style={{ background: 'rgba(8,11,20,0.8)', backdropFilter: 'blur(8px)' }}>
+      <div className="flex flex-col items-center gap-3">
+        <Spinner size="lg" />
+        <p className="text-sm text-white/40 font-medium">Chargement…</p>
+      </div>
     </div>
   )
 }
@@ -24,15 +27,8 @@ export function SkeletonRow({ cols = 4 }: { cols?: number }) {
   return (
     <tr>
       {Array.from({ length: cols }).map((_, i) => (
-        <td key={i} className="px-4 py-3">
-          <div
-            className="h-4 rounded bg-slate-200 animate-shimmer"
-            style={{
-              backgroundImage: 'linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%)',
-              backgroundSize: '200% 100%',
-              width: `${60 + (i * 13) % 30}%`,
-            }}
-          />
+        <td key={i} className="px-4 py-3.5">
+          <div className="skeleton h-4" style={{ width: `${55 + (i * 11) % 35}%` }} />
         </td>
       ))}
     </tr>
