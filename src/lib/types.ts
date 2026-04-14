@@ -133,6 +133,15 @@ export interface ChatMessage {
   timestamp: string
 }
 
+// ─── Invoice template (defaults for new invoices, stored in localStorage) ────
+
+export interface InvoiceTemplate {
+  paiement:    string
+  echeanceIdx: number
+  notes:       string
+  lignes:      LineItem[]
+}
+
 // ─── Airtable Config ─────────────────────────────────────────────────────────
 
 export const AT_BASE = 'appdpkBZRuqEWgOwB'

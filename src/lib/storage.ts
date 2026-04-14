@@ -1,4 +1,4 @@
-import type { Client, Config, Invoice, Profil } from './types'
+import type { Client, Config, Invoice, InvoiceTemplate, Profil } from './types'
 
 // ─── Safe localStorage wrapper ───────────────────────────────────────────────
 
@@ -60,4 +60,12 @@ export const storage = {
 
   getConfig: (): Config => get<Config>('config', {}),
   setConfig: (v: Config) => set('config', v),
+
+  getTemplate: (): InvoiceTemplate => get<InvoiceTemplate>('invoice_template', {
+    paiement:    'Virement bancaire',
+    echeanceIdx: 2,
+    notes:       '',
+    lignes:      [{ desc: '', qte: 1, pu: 0 }],
+  }),
+  setTemplate: (v: InvoiceTemplate) => set('invoice_template', v),
 }

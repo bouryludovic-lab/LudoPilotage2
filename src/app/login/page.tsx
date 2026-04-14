@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import { Zap, Delete } from 'lucide-react'
 import { storage } from '@/lib/storage'
@@ -122,6 +123,10 @@ export default function LoginPage() {
           <p className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>
             Entrez votre code PIN
           </p>
+          <Link href="/signup"
+            className="mt-2 text-xs font-medium text-violet-400 hover:text-violet-300 transition-colors">
+            Première connexion ? Créer un compte
+          </Link>
         </div>
 
         <div className="flex justify-center gap-4 mb-8">
