@@ -1,174 +1,174 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import {
-  LayoutDashboard, FileText, Users, Plus, User, Database,
-  Settings, HelpCircle, X, MessageSquare,
-} from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
+import { storage } from '@/lib/storage'
+import {
+  LayoutDashboard, FileText, Users, MessageSquare,
+  Bot, ClipboardList, GraduationCap, Settings,
+  LogOut, Zap,
+} from 'lucide-react'
 
-interface SidebarProps {
-  open: boolean
-  onClose: () => void
-}
-
-const NAV_MAIN = [
-  { href: '/dashboard',     label: 'Tableau de bord',    icon: LayoutDashboard },
-  { href: '/factures',      label: 'Factures',           icon: FileText,        badge: 'pending' },
-  { href: '/clients',       label: 'Clients',            icon: Users },
-  { href: '/factures/nouvelle', label: '+ Nouvelle facture', icon: Plus },
+const NAV_ITEMS = [
+  { href: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard',     group: 'main' },
+  { href: '/factures',      icon: FileText,         label: 'Facturation',   group: 'main', badge: true },
+  { href: '/clients',       icon: Users,            label: 'Clients',       group: 'main' },
+  { href: '/hub',           icon: MessageSquare,    label: 'HUB',           group: 'tools', isNew: true },
+  { href: '/agent',         icon: Bot,              label: 'Agent IA',      group: 'tools', isNew: true },
+  { href: '/formulaires',   icon: ClipboardList,    label: 'Formulaires',   group: 'tools' },
+  { href: '/coaching',      icon: GraduationCap,    label: 'Coaching',      group: 'tools' },
+  { href: '/configuration', icon: Settings,         label: 'Configuration', group: 'bottom' },
 ]
 
-const NAV_SETTINGS = [
-  { href: '/profil',        label: 'Mon profil',         icon: User },
-  { href: '/configuration', label: 'Configuration',      icon: Settings },
-]
+export function Sidebar() {
+  const pathname = usePathname()
+  const router   = useRouter()
+  const factures = useAppStore(s => s.factures)
+  const profil   = useAppStore(s => s.profil)
 
-const NAV_COACHING = [
-  { href: '/coaching',      label: 'Questions élèves',   icon: MessageSquare },
-  { href: '/howto',         label: 'How to use',         icon: HelpCircle },
-]
+  const pendingCount = factures.filter(f => f.statut === 'pending' || f.statut === 'overdue').length
 
-export function Sidebar({ open, onClose }: SidebarProps) {
-  const pathname  = usePathname()
-  const factures  = useAppStore(s => s.factures)
-  const profil    = useAppStore(s => s.profil)
+  function handleLogout() {
+    storage.logout()
+    router.push('/login')
+  }
 
-  const pendingCount = factures.filter(f => f.statut === 'pending' || f.statut === 'sent').length
-  const initials = profil.nom
-    ? profil.nom.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
-    : '?'
+  const mainItems   = NAV_ITEMS.filter(i => i.group === 'main')
+  const toolItems   = NAV_ITEMS.filter(i => i.group === 'tools')
+  const bottomItems = NAV_ITEMS.filter(i => i.group === 'bottom')
 
   return (
-    <>
-      {/* Mobile overlay */}
-      {open && (
+    <aside
+      className="fixed left-0 top-0 h-screen w-[220px] flex flex-col z-30 select-none"
+      style={{ background: '#0E1420', borderRight: '1px solid rgba(255,255,255,0.05)' }}
+    >
+      {/* Logo */}
+      <div className="px-4 py-5 flex items-center gap-3">
         <div
-          className="fixed inset-0 bg-black/40 z-40 md:hidden"
-          onClick={onClose}
-        />
-      )}
-
-      <aside className={cn(
-        'fixed md:static inset-y-0 left-0 z-50 w-60 bg-slate-900 flex flex-col transition-transform duration-250',
-        'md:translate-x-0',
-        open ? 'translate-x-0' : '-translate-x-full',
-      )}>
-        {/* Brand */}
-        <div className="px-4 py-5 border-b border-white/[0.07]">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                <FileText className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <div className="text-[13px] font-bold text-white leading-tight tracking-wide">THE NEXT STEP</div>
-                <div className="text-[9px] text-white/40 tracking-[1.5px] mt-0.5">CONSULTING & STRATEGY</div>
-              </div>
-            </div>
-            <button onClick={onClose} className="md:hidden text-slate-500 hover:text-white p-1">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg, #7C3AED, #4F46E5)' }}
+        >
+          <Zap className="w-[18px] h-[18px] text-white" strokeWidth={2.5} />
         </div>
+        <div className="min-w-0">
+          <p className="text-[13px] font-bold text-white leading-none truncate">LudoPilotage</p>
+          <p className="text-[10px] mt-0.5 leading-none font-medium" style={{ color: 'rgba(167,139,250,0.6)' }}>SaaS IA</p>
+        </div>
+      </div>
 
-        {/* Nav */}
-        <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
-          {NAV_MAIN.map(item => {
-            const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href) && item.href !== '/factures/nouvelle')
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onClose}
-                className={cn(
-                  'flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-normal transition-all duration-150',
-                  active
-                    ? 'bg-blue-500/15 text-blue-200'
-                    : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-200',
-                )}
-              >
-                <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors',
-                  active ? 'bg-blue-500' : 'bg-slate-600',
-                )} />
-                <span className="flex-1">{item.label}</span>
-                {item.badge === 'pending' && pendingCount > 0 && (
-                  <span className="bg-blue-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
-                    {pendingCount}
-                  </span>
-                )}
-              </Link>
-            )
-          })}
+      {/* Nav */}
+      <nav className="flex-1 px-3 overflow-y-auto space-y-0.5 pb-2">
+        <SectionLabel>Principal</SectionLabel>
+        {mainItems.map(item => (
+          <NavItem
+            key={item.href}
+            item={item}
+            active={isActive(pathname, item.href)}
+            badge={item.badge && pendingCount > 0 ? pendingCount : undefined}
+          />
+        ))}
 
-          <div className="pt-3 pb-1 px-2 text-[10px] font-semibold text-slate-600 uppercase tracking-[0.8px]">
-            Paramètres
-          </div>
-          {NAV_SETTINGS.map(item => {
-            const active = pathname.startsWith(item.href)
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onClose}
-                className={cn(
-                  'flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] transition-all duration-150',
-                  active
-                    ? 'bg-blue-500/15 text-blue-200'
-                    : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-200',
-                )}
-              >
-                <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', active ? 'bg-blue-500' : 'bg-slate-600')} />
-                {item.label}
-              </Link>
-            )
-          })}
+        <SectionLabel className="mt-4">Outils IA</SectionLabel>
+        {toolItems.map(item => (
+          <NavItem
+            key={item.href}
+            item={item}
+            active={isActive(pathname, item.href)}
+            isNew={item.isNew}
+          />
+        ))}
+      </nav>
 
-          <div className="pt-3 pb-1 px-2 text-[10px] font-semibold text-slate-600 uppercase tracking-[0.8px]">
-            Coaching
-          </div>
-          {NAV_COACHING.map(item => {
-            const active = pathname.startsWith(item.href)
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onClose}
-                className={cn(
-                  'flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] transition-all duration-150',
-                  active
-                    ? 'bg-blue-500/15 text-blue-200'
-                    : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-200',
-                )}
-              >
-                <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', active ? 'bg-blue-500' : 'bg-slate-600')} />
-                {item.label}
-              </Link>
-            )
-          })}
-        </nav>
+      {/* Bottom */}
+      <div className="px-3 pb-4 pt-3 space-y-0.5" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        {bottomItems.map(item => (
+          <NavItem
+            key={item.href}
+            item={item}
+            active={isActive(pathname, item.href)}
+          />
+        ))}
 
-        {/* User */}
-        <div className="border-t border-white/[0.07] p-2">
-          <Link
-            href="/profil"
-            onClick={onClose}
-            className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/[0.05] transition-colors"
+        {/* User card */}
+        <div
+          className="mt-2 flex items-center gap-2.5 px-3 py-2.5 rounded-xl"
+          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}
+        >
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
+            style={{ background: 'linear-gradient(135deg, #7C3AED, #4F46E5)' }}
           >
-            <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
-              {initials}
-            </div>
-            <div className="min-w-0">
-              <div className="text-[13px] font-medium text-slate-300 truncate">
-                {profil.nom || 'Mon profil'}
-              </div>
-              <div className="text-[11px] text-slate-600">Auto-entrepreneur</div>
-            </div>
-          </Link>
+            {(profil?.nom || 'U').charAt(0).toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold truncate" style={{ color: 'rgba(255,255,255,0.75)' }}>
+              {profil?.nom || 'Mon compte'}
+            </p>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="p-1 rounded-lg transition-colors"
+            style={{ color: 'rgba(255,255,255,0.2)' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#F87171'; (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.1)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.2)'; (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+            title="Déconnexion"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
         </div>
-      </aside>
-    </>
+      </div>
+    </aside>
+  )
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function isActive(pathname: string, href: string) {
+  if (href === '/dashboard') return pathname === href
+  return pathname === href || pathname.startsWith(href + '/')
+}
+
+function SectionLabel({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <p className={cn('text-[10px] font-bold uppercase tracking-widest px-3 pt-2 pb-1.5', className)}
+      style={{ color: 'rgba(255,255,255,0.18)' }}>
+      {children}
+    </p>
+  )
+}
+
+interface NavItemProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  item: { href: string; icon: React.ComponentType<any>; label: string }
+  active: boolean
+  badge?: number
+  isNew?: boolean
+}
+
+function NavItem({ item, active, badge, isNew }: NavItemProps) {
+  const Icon = item.icon
+  return (
+    <Link href={item.href} className={cn('nav-item', active && 'active')}>
+      <Icon className="w-4 h-4 flex-shrink-0" strokeWidth={active ? 2.5 : 2} />
+      <span className="flex-1 truncate">{item.label}</span>
+      {badge !== undefined && badge > 0 && (
+        <span
+          className="w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center"
+          style={{ background: 'rgba(245,158,11,0.2)', color: '#FCD34D' }}
+        >
+          {badge > 9 ? '9+' : badge}
+        </span>
+      )}
+      {isNew && !badge && (
+        <span
+          className="text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none"
+          style={{ background: 'rgba(124,58,237,0.25)', color: '#A78BFA' }}
+        >
+          NEW
+        </span>
+      )}
+    </Link>
   )
 }

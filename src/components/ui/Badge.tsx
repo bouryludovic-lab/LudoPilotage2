@@ -1,25 +1,48 @@
 import { cn } from '@/lib/utils'
 import type { InvoiceStatus } from '@/lib/types'
 
-const VARIANTS = {
-  draft:   'bg-slate-100 text-slate-500',
-  pending: 'bg-amber-50 text-amber-700',
-  sent:    'bg-blue-50 text-blue-700',
-  paid:    'bg-green-50 text-green-700',
-  error:   'bg-red-50 text-red-700',
-  overdue: 'bg-red-50 text-red-700',
-} satisfies Record<InvoiceStatus, string>
+// ─── Generic Badge ────────────────────────────────────────────────────────────
 
-const DOT_COLORS = {
-  draft:   'bg-slate-400',
-  pending: 'bg-amber-500',
-  sent:    'bg-blue-500',
-  paid:    'bg-green-500',
-  error:   'bg-red-500',
-  overdue: 'bg-red-500',
-} satisfies Record<InvoiceStatus, string>
+type BadgeVariant = 'violet' | 'green' | 'amber' | 'red' | 'blue' | 'slate' | 'indigo'
 
-const LABELS: Record<InvoiceStatus, string> = {
+interface BadgeProps {
+  variant?: BadgeVariant
+  children: React.ReactNode
+  className?: string
+  dot?: boolean
+}
+
+const BADGE_VARIANTS: Record<BadgeVariant, string> = {
+  violet: 'badge-violet',
+  green:  'badge-green',
+  amber:  'badge-amber',
+  red:    'badge-red',
+  blue:   'badge-blue',
+  slate:  'badge-slate',
+  indigo: 'bg-indigo-500/15 text-indigo-300',
+}
+
+export function Badge({ variant = 'slate', children, className, dot }: BadgeProps) {
+  return (
+    <span className={cn('badge', BADGE_VARIANTS[variant], className)}>
+      {dot && <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />}
+      {children}
+    </span>
+  )
+}
+
+// ─── Status Badge (Invoice) ───────────────────────────────────────────────────
+
+const STATUS_VARIANTS: Record<InvoiceStatus, string> = {
+  draft:   'badge-slate',
+  pending: 'badge-amber',
+  sent:    'badge-blue',
+  paid:    'badge-green',
+  error:   'badge-red',
+  overdue: 'badge-red',
+}
+
+const STATUS_LABELS: Record<InvoiceStatus, string> = {
   draft:   'Brouillon',
   pending: 'En attente',
   sent:    'Envoyée',
@@ -28,20 +51,16 @@ const LABELS: Record<InvoiceStatus, string> = {
   overdue: 'En retard',
 }
 
-interface BadgeProps {
+interface StatusBadgeProps {
   status: InvoiceStatus
   className?: string
 }
 
-export function StatusBadge({ status, className }: BadgeProps) {
+export function StatusBadge({ status, className }: StatusBadgeProps) {
   return (
-    <span className={cn(
-      'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold',
-      VARIANTS[status],
-      className,
-    )}>
-      <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', DOT_COLORS[status])} />
-      {LABELS[status]}
+    <span className={cn('badge', STATUS_VARIANTS[status], className)}>
+      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
+      {STATUS_LABELS[status]}
     </span>
   )
 }

@@ -16,6 +16,9 @@ export function formatEur(amount: number): string {
   }).format(amount)
 }
 
+/** Alias used across new pages */
+export const formatMontant = formatEur
+
 export function formatDate(dateStr: string): string {
   if (!dateStr) return '—'
   try {

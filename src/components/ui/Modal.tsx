@@ -3,18 +3,19 @@
 import { useEffect, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Button } from './Button'
 
 interface ModalProps {
   open: boolean
   onClose: () => void
-  title: string
+  title?: string
   children: ReactNode
   footer?: ReactNode
   wide?: boolean
+  size?: 'sm' | 'md' | 'lg' | 'xl'
 }
 
-export function Modal({ open, onClose, title, children, footer, wide }: ModalProps) {
-  // Close on Escape
+export function Modal({ open, onClose, title, children, footer, wide, size = 'md' }: ModalProps) {
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -22,7 +23,6 @@ export function Modal({ open, onClose, title, children, footer, wide }: ModalPro
     return () => window.removeEventListener('keydown', handler)
   }, [open, onClose])
 
-  // Prevent scroll on body
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
@@ -30,32 +30,34 @@ export function Modal({ open, onClose, title, children, footer, wide }: ModalPro
 
   if (!open) return null
 
+  const maxWidths = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' }
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
+      style={{ background: 'rgba(8,11,20,0.85)', backdropFilter: 'blur(8px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div className={cn(
-        'bg-white rounded-xl shadow-xl w-full max-h-[90vh] overflow-y-auto animate-slide-in',
-        wide ? 'max-w-2xl' : 'max-w-lg',
+        'glass-strong rounded-2xl w-full max-h-[90vh] overflow-y-auto animate-slide-up shadow-card',
+        wide ? 'max-w-2xl' : maxWidths[size],
       )}>
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-          <h2 className="text-[15px] font-semibold text-slate-900">{title}</h2>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+        {title && (
+          <div className="flex items-center justify-between px-6 py-4 border-b border-white/6">
+            <h2 className="text-base font-semibold text-white/90">{title}</h2>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/6 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
-        {/* Body */}
-        <div className="p-5">{children}</div>
+        <div className="p-6">{children}</div>
 
-        {/* Footer */}
         {footer && (
-          <div className="flex justify-end gap-2 px-5 py-3.5 border-t border-slate-100 bg-slate-50 rounded-b-xl">
+          <div className="flex justify-end gap-2.5 px-6 py-4 border-t border-white/6">
             {footer}
           </div>
         )}
@@ -85,30 +87,22 @@ export function ConfirmModal({
       open={open}
       onClose={onClose}
       title={title}
+      size="sm"
       footer={
         <>
-          <button
-            onClick={onClose}
-            className="px-3.5 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            Annuler
-          </button>
-          <button
+          <Button variant="ghost" size="sm" onClick={onClose}>Annuler</Button>
+          <Button
+            variant={danger ? 'danger' : 'primary'}
+            size="sm"
             onClick={onConfirm}
-            disabled={loading}
-            className={cn(
-              'px-3.5 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-60',
-              danger
-                ? 'bg-red-600 text-white hover:bg-red-700'
-                : 'bg-blue-600 text-white hover:bg-blue-700',
-            )}
+            loading={loading}
           >
-            {loading ? 'En cours…' : confirmLabel}
-          </button>
+            {confirmLabel}
+          </Button>
         </>
       }
     >
-      <p className="text-sm text-slate-600">{message}</p>
+      <p className="text-sm text-white/60 leading-relaxed">{message}</p>
     </Modal>
   )
 }

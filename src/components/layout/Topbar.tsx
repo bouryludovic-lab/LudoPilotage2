@@ -1,6 +1,6 @@
 'use client'
 
-import { Menu, RefreshCw, Plus } from 'lucide-react'
+import { RefreshCw, Plus } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useSync } from '@/hooks/useSync'
@@ -8,37 +8,36 @@ import { useSync } from '@/hooks/useSync'
 interface TopbarProps {
   title: string
   subtitle?: string
-  onMenuClick: () => void
   actions?: React.ReactNode
 }
 
-export function Topbar({ title, subtitle, onMenuClick, actions }: TopbarProps) {
+export function Topbar({ title, subtitle, actions }: TopbarProps) {
   const { sync, syncing } = useSync()
 
   return (
-    <header className="bg-white border-b border-slate-200 px-6 h-[60px] flex items-center justify-between sticky top-0 z-20 shadow-sm">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={onMenuClick}
-          className="md:hidden p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
-        <div>
-          <h1 className="text-[15px] font-semibold text-slate-900 leading-tight">{title}</h1>
-          {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
-        </div>
+    <header
+      className="h-[60px] flex items-center justify-between px-6 sticky top-0 z-20"
+      style={{
+        background: 'rgba(8,11,20,0.85)',
+        backdropFilter: 'blur(12px)',
+        borderBottom: '1px solid rgba(255,255,255,0.05)',
+      }}
+    >
+      <div>
+        <h1 className="text-[15px] font-bold text-white/90 leading-tight">{title}</h1>
+        {subtitle && <p className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{subtitle}</p>}
       </div>
 
       <div className="flex items-center gap-2">
         <button
           onClick={sync}
           disabled={syncing}
-          title="Synchroniser avec Airtable"
+          title="Synchroniser"
           className={cn(
-            'p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors',
-            syncing && 'opacity-50 cursor-not-allowed',
+            'p-2 rounded-xl transition-colors',
+            syncing ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/6',
           )}
+          style={{ color: 'rgba(255,255,255,0.35)' }}
         >
           <RefreshCw className={cn('w-4 h-4', syncing && 'animate-spin')} />
         </button>
@@ -47,9 +46,10 @@ export function Topbar({ title, subtitle, onMenuClick, actions }: TopbarProps) {
 
         <Link
           href="/factures/nouvelle"
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 text-white text-[13px] font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-semibold rounded-xl transition-all active:scale-95"
+          style={{ background: 'linear-gradient(135deg, #7C3AED, #4F46E5)', color: 'white' }}
         >
-          <Plus className="w-3.5 h-3.5" />
+          <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
           <span className="hidden sm:inline">Nouvelle facture</span>
         </Link>
       </div>

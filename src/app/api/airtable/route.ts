@@ -2,11 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 
 /**
  * Server-side Airtable proxy.
- * The client sends: { table, method, id?, fields?, query? }
- * This route uses AIRTABLE_TOKEN from env — never exposed to the browser.
- *
- * If AIRTABLE_TOKEN is not set, falls back to the token sent in
- * X-AT-Token header (for backward-compat while user sets up Vercel env).
+ * Client sends: { table, method, id?, fields?, query?, useFieldNames? }
+ * AIRTABLE_TOKEN read from server env — never exposed to browser.
+ * useFieldNames=true → skip returnFieldsByFieldId (for new tables using field names)
  */
 
 const BASE = process.env.NEXT_PUBLIC_AT_BASE ?? 'appdpkBZRuqEWgOwB'
@@ -26,7 +24,7 @@ function atHeaders(token: string): HeadersInit {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { table, method = 'GET', id, fields, query } = body
+    const { table, method = 'GET', id, fields, query, useFieldNames } = body
 
     if (!table) return NextResponse.json({ error: 'Missing table' }, { status: 400 })
 
@@ -45,7 +43,8 @@ export async function POST(req: NextRequest) {
       const records: unknown[] = []
       let offset: string | null = null
       do {
-        const q = 'pageSize=100' + (offset ? '&offset=' + offset : '') + (query ? '&' + query : '')
+        const fieldParam: string = useFieldNames ? '' : '&returnFieldsByFieldId=true'
+        const q: string = 'pageSize=100' + fieldParam + (offset ? '&offset=' + offset : '') + (query ? '&' + query : '')
         const r = await fetch(atUrl(table, undefined, q), { headers: atHeaders(token) })
         if (!r.ok) return NextResponse.json({ error: `Airtable ${r.status}` }, { status: r.status })
         const d = await r.json()

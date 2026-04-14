@@ -1,7 +1,7 @@
 import { AT_BASE, AT_FIELDS, AT_TABLES, type Client, type Invoice, type Profil, type TableName } from './types'
 import { storage } from './storage'
 
-// ─── Core Airtable client ─────────────────────────────────────────────────────
+// ─── Core client (client-side, uses localStorage token) ─────────────────────
 
 function headers(): HeadersInit {
   return {
@@ -20,7 +20,7 @@ async function getAll(table: string): Promise<Array<{ id: string; fields: Record
   let offset: string | null = null
 
   do {
-    const u = url(table) + '?pageSize=100' + (offset ? '&offset=' + offset : '')
+    const u: string = url(table) + '?pageSize=100' + (offset ? '&offset=' + offset : '')
     const r = await fetch(u, { headers: headers() })
     if (!r.ok) throw new Error(`Airtable ${r.status}: ${r.statusText}`)
     const d = await r.json()
@@ -67,7 +67,7 @@ async function del(table: string, id: string) {
 // ─── Auth helpers ─────────────────────────────────────────────────────────────
 
 export async function fetchProfilByBootstrapToken(bootstrapToken: string): Promise<Array<{ id: string; fields: Record<string, unknown> }>> {
-  const r = await fetch(url(AT_TABLES.profil), {
+  const r = await fetch(url(AT_TABLES.profils), {
     headers: {
       Authorization: `Bearer ${bootstrapToken}`,
       'Content-Type': 'application/json',
@@ -81,7 +81,7 @@ export async function fetchProfilByBootstrapToken(bootstrapToken: string): Promi
   }))
 }
 
-// ─── Domain sync ─────────────────────────────────────────────────────────────
+// ─── Domain sync (new tables, field names) ────────────────────────────────────
 
 const F = AT_FIELDS
 
@@ -106,52 +106,47 @@ export async function syncFactures(): Promise<Invoice[]> {
     let lignes: Invoice['lignes'] = []
     try {
       const raw = f[F.factures.prestation]
-      if (typeof raw === 'string' && raw.startsWith('[')) {
-        lignes = JSON.parse(raw)
-      }
+      if (typeof raw === 'string' && raw.startsWith('[')) lignes = JSON.parse(raw)
     } catch {}
-
-    const total = Number(f[F.factures.montant] ?? 0)
     return {
       id:           rec.id,
       atId:         rec.id,
-      num:          String(f[F.factures.num]          ?? ''),
-      date:         String(f[F.factures.date]         ?? ''),
-      echeance:     String(f[F.factures.echeance]     ?? ''),
+      num:          String(f[F.factures.num]           ?? ''),
+      date:         String(f[F.factures.date]          ?? ''),
+      echeance:     String(f[F.factures.echeance]      ?? ''),
       echeanceLabel:'',
       clientId:     '',
-      clientNom:    String(f[F.factures.client]       ?? ''),
-      clientEmail:  String(f[F.factures.email]        ?? ''),
+      clientNom:    String(f[F.factures.client_nom]    ?? ''),
+      clientEmail:  String(f[F.factures.client_email]  ?? ''),
       clientAdresse:'',
       clientSiret:  '',
-      paiement:     String(f[F.factures.paiement]     ?? ''),
+      paiement:     String(f[F.factures.paiement]      ?? ''),
       iban:         '',
-      notes:        String(f[F.factures.notes]        ?? ''),
+      notes:        String(f[F.factures.notes]         ?? ''),
       lignes,
-      total,
-      statut:       (String(f[F.factures.statut] ?? 'pending')) as Invoice['statut'],
-      dateEnvoi:    f[F.factures.dateEnvoi] ? String(f[F.factures.dateEnvoi]) : undefined,
-      pdfUrl:       f[F.factures.pdfUrl]    ? String(f[F.factures.pdfUrl])    : undefined,
-      emailEnvoye:  Boolean(f[F.factures.emailEnvoye]),
+      total:        Number(f[F.factures.montant]       ?? 0),
+      statut:       (String(f[F.factures.statut]       ?? 'pending')) as Invoice['statut'],
+      dateEnvoi:    f[F.factures.date_envoi]  ? String(f[F.factures.date_envoi])  : undefined,
+      pdfUrl:       f[F.factures.pdf_url]     ? String(f[F.factures.pdf_url])     : undefined,
+      emailEnvoye:  Boolean(f[F.factures.email_envoye]),
     }
   })
 }
 
 export async function syncProfil(): Promise<Profil | null> {
-  const records = await getAll(AT_TABLES.profil)
+  const records = await getAll(AT_TABLES.profils)
   if (!records.length) return null
   const rec = records[0]
   const f = rec.fields
   return {
     atId:    rec.id,
-    nom:     String(f[F.profil.nom]     ?? ''),
-    siret:   String(f[F.profil.siret]   ?? ''),
-    adresse: String(f[F.profil.adresse] ?? ''),
-    email:   String(f[F.profil.email]   ?? ''),
-    tel:     String(f[F.profil.tel]     ?? ''),
-    iban:    String(f[F.profil.iban]    ?? ''),
-    prefix:  String(f[F.profil.prefix]  ?? 'F-'),
-    logo:    f[F.profil.logo] ? String(f[F.profil.logo]) : undefined,
+    nom:     String(f[F.profils.nom]     ?? ''),
+    siret:   String(f[F.profils.siret]   ?? ''),
+    adresse: String(f[F.profils.adresse] ?? ''),
+    email:   String(f[F.profils.email]   ?? ''),
+    tel:     String(f[F.profils.tel]     ?? ''),
+    iban:    String(f[F.profils.iban]    ?? ''),
+    prefix:  String(f[F.profils.prefix]  ?? 'F-'),
   }
 }
 
@@ -186,16 +181,16 @@ export async function deleteClient(atId: string) {
 
 export async function createFacture(inv: Invoice): Promise<string | null> {
   const rec = await create(AT_TABLES.factures, {
-    [F.factures.num]:        inv.num,
-    [F.factures.client]:     inv.clientNom,
-    [F.factures.montant]:    inv.total,
-    [F.factures.date]:       inv.date,
-    [F.factures.echeance]:   inv.echeance,
-    [F.factures.statut]:     inv.statut,
-    [F.factures.prestation]: JSON.stringify(inv.lignes),
-    [F.factures.paiement]:   inv.paiement,
-    [F.factures.email]:      inv.clientEmail,
-    [F.factures.notes]:      inv.notes,
+    [F.factures.num]:         inv.num,
+    [F.factures.client_nom]:  inv.clientNom,
+    [F.factures.client_email]:inv.clientEmail,
+    [F.factures.montant]:     inv.total,
+    [F.factures.date]:        inv.date,
+    [F.factures.echeance]:    inv.echeance,
+    [F.factures.statut]:      inv.statut,
+    [F.factures.prestation]:  JSON.stringify(inv.lignes),
+    [F.factures.paiement]:    inv.paiement,
+    [F.factures.notes]:       inv.notes,
   })
   return rec?.id ?? null
 }
@@ -206,9 +201,9 @@ export async function updateFactureStatut(atId: string, statut: string) {
 
 export async function updateFacturePdfUrl(atId: string, pdfUrl: string) {
   return update(AT_TABLES.factures, atId, {
-    [F.factures.pdfUrl]:     pdfUrl,
-    [F.factures.emailEnvoye]: true,
-    [F.factures.dateEnvoi]:  new Date().toISOString().split('T')[0],
+    [F.factures.pdf_url]:      pdfUrl,
+    [F.factures.email_envoye]: true,
+    [F.factures.date_envoi]:   new Date().toISOString().split('T')[0],
   })
 }
 
@@ -218,14 +213,14 @@ export async function deleteFacture(atId: string) {
 
 export async function updateProfilInAirtable(atId: string, profil: Partial<Profil>) {
   const fields: Record<string, unknown> = {}
-  if (profil.nom     !== undefined) fields[F.profil.nom]     = profil.nom
-  if (profil.siret   !== undefined) fields[F.profil.siret]   = profil.siret
-  if (profil.adresse !== undefined) fields[F.profil.adresse] = profil.adresse
-  if (profil.email   !== undefined) fields[F.profil.email]   = profil.email
-  if (profil.tel     !== undefined) fields[F.profil.tel]     = profil.tel
-  if (profil.iban    !== undefined) fields[F.profil.iban]    = profil.iban
-  if (profil.prefix  !== undefined) fields[F.profil.prefix]  = profil.prefix
-  return update(AT_TABLES.profil, atId, fields)
+  if (profil.nom     !== undefined) fields[F.profils.nom]     = profil.nom
+  if (profil.siret   !== undefined) fields[F.profils.siret]   = profil.siret
+  if (profil.adresse !== undefined) fields[F.profils.adresse] = profil.adresse
+  if (profil.email   !== undefined) fields[F.profils.email]   = profil.email
+  if (profil.tel     !== undefined) fields[F.profils.tel]     = profil.tel
+  if (profil.iban    !== undefined) fields[F.profils.iban]    = profil.iban
+  if (profil.prefix  !== undefined) fields[F.profils.prefix]  = profil.prefix
+  return update(AT_TABLES.profils, atId, fields)
 }
 
 // ─── GitHub PDF upload ───────────────────────────────────────────────────────
@@ -245,16 +240,10 @@ export async function uploadPdfToGitHub(
     const check = await fetch(apiUrl, {
       headers: { Authorization: `Bearer ${ghToken}`, Accept: 'application/vnd.github.v3+json' },
     })
-    if (check.ok) {
-      const data = await check.json()
-      sha = data.sha
-    }
+    if (check.ok) { const data = await check.json(); sha = data.sha }
   } catch {}
 
-  const body: Record<string, unknown> = {
-    message: `Add invoice ${filename}`,
-    content: base64Content,
-  }
+  const body: Record<string, unknown> = { message: `Add invoice ${filename}`, content: base64Content }
   if (sha) body.sha = sha
 
   const res = await fetch(apiUrl, {
@@ -271,7 +260,7 @@ export async function uploadPdfToGitHub(
   return `https://${owner}.github.io/${repo}/${path}`
 }
 
-// ─── Make webhook (email + AI) ────────────────────────────────────────────────
+// ─── Make webhook ─────────────────────────────────────────────────────────────
 
 export async function sendViaWebhook(webhookUrl: string, payload: Record<string, unknown>) {
   const r = await fetch(webhookUrl, {

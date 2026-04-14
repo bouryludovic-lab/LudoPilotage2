@@ -2,224 +2,194 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { FileText, Loader2, Settings } from 'lucide-react'
+import { toast } from 'sonner'
+import { Zap, Delete } from 'lucide-react'
 import { storage } from '@/lib/storage'
-import { useAuth } from '@/hooks/useAuth'
-import { cn } from '@/lib/utils'
+import { useAppStore } from '@/store'
 
 export default function LoginPage() {
-  const router = useRouter()
-  const { checkPin, setupAccount } = useAuth()
-
-  const [pin,        setPin]        = useState('')
-  const [error,      setError]      = useState('')
-  const [loading,    setLoading]    = useState(false)
-
-  // Admin setup — hidden, accessible via double-click on the logo
-  const [showSetup,  setShowSetup]  = useState(false)
-  const [token,      setToken]      = useState('')
-  const [setupError, setSetupError] = useState('')
+  const [pin, setPin]         = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError]     = useState('')
   const [logoClicks, setLogoClicks] = useState(0)
+  const [showSetup, setShowSetup]   = useState(false)
+  const [setupToken, setSetupToken] = useState('')
+  const router = useRouter()
+  const setProfil = useAppStore(s => s.setProfil)
 
   useEffect(() => {
     if (storage.isLoggedIn()) router.replace('/dashboard')
-  }, [router])
+  }, [])
 
-  // Secret: 5 clicks on logo reveals setup
-  function handleLogoClick() {
-    const next = logoClicks + 1
-    setLogoClicks(next)
-    if (next >= 5) { setShowSetup(true); setLogoClicks(0) }
-  }
-
-  // ── PIN pad ──────────────────────────────────────────────────────────────────
-
-  const pressPin = useCallback(async (key: string) => {
-    if (loading || showSetup) return
+  const handleDigit = useCallback((d: string) => {
+    if (loading) return
     setError('')
+    setPin(p => p.length < 4 ? p + d : p)
+  }, [loading])
 
-    if (key === 'back') {
-      setPin(p => p.slice(0, -1))
-      return
-    }
+  const handleDelete = useCallback(() => {
+    if (loading) return
+    setPin(p => p.slice(0, -1))
+    setError('')
+  }, [loading])
 
-    const next = key === 'ok' ? pin : pin.length < 4 ? pin + key : pin
-    setPin(next)
+  useEffect(() => {
+    if (pin.length === 4) submit(pin)
+  }, [pin])
 
-    if (next.length === 4) {
-      setLoading(true)
-      const result = await checkPin(next)
-      setLoading(false)
-      if (result.ok) {
-        router.replace('/dashboard')
-      } else {
-        setError(result.error ?? 'PIN incorrect')
-        setPin('')
-      }
-    }
-  }, [pin, loading, showSetup, checkPin, router])
-
-  // Keyboard support
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (showSetup) return
-      if (/^\d$/.test(e.key)) pressPin(e.key)
-      if (e.key === 'Backspace') pressPin('back')
-      if (e.key === 'Enter') pressPin('ok')
+      if (/^[0-9]$/.test(e.key)) handleDigit(e.key)
+      else if (e.key === 'Backspace') handleDelete()
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [showSetup, pressPin])
+  }, [handleDigit, handleDelete])
 
-  // ── Admin setup ───────────────────────────────────────────────────────────────
-
-  async function handleSetup() {
-    setSetupError('')
-    if (!token.startsWith('pat')) {
-      setSetupError('Le token doit commencer par "pat"')
-      return
-    }
+  async function submit(p: string) {
     setLoading(true)
-    const result = await setupAccount(token)
-    setLoading(false)
-    if (result.ok) {
-      setShowSetup(false)
-      setToken('')
-      if (storage.isLoggedIn()) router.replace('/dashboard')
-      // else: user will now enter PIN
-    } else {
-      setSetupError(result.error ?? 'Configuration échouée')
+    setError('')
+    try {
+      const res = await fetch('/api/auth/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: p }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        storage.setToken(data.userEmail || p)
+        if (data.profil) {
+          setProfil(data.profil)
+          storage.setProfil(data.profil)
+        }
+        toast.success('Connexion réussie')
+        router.replace('/dashboard')
+      } else {
+        setError(data.error || 'PIN incorrect')
+        setPin('')
+        setLoading(false)
+      }
+    } catch {
+      setError('Erreur de connexion')
+      setPin('')
+      setLoading(false)
     }
   }
 
-  return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
-      <div className="w-full max-w-sm">
+  function handleLogoClick() {
+    const next = logoClicks + 1
+    setLogoClicks(next)
+    if (next >= 5) {
+      setShowSetup(p => !p)
+      setLogoClicks(0)
+    }
+  }
 
-        {/* Brand */}
-        <div className="text-center mb-10">
-          <div
-            className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-5 cursor-pointer select-none active:scale-95 transition-transform"
+  function saveSetupToken() {
+    if (!setupToken.startsWith('pat')) {
+      toast.error('Token invalide (doit commencer par pat…)')
+      return
+    }
+    storage.setBootstrapToken(setupToken)
+    toast.success('Token Bootstrap sauvegardé')
+    setShowSetup(false)
+    setSetupToken('')
+  }
+
+  const DIGITS = ['1','2','3','4','5','6','7','8','9','','0','⌫']
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#080B14' }}>
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="orb orb-violet w-[600px] h-[600px] -top-48 -left-48 opacity-35" />
+        <div className="orb orb-indigo w-[500px] h-[500px] -bottom-48 -right-48 opacity-25" />
+      </div>
+
+      <div className="relative w-full max-w-[320px] animate-slide-up">
+        <div className="flex flex-col items-center mb-10">
+          <button
             onClick={handleLogoClick}
-            title=""
+            className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
+            style={{
+              background: 'linear-gradient(135deg, #7C3AED, #4F46E5)',
+              boxShadow: '0 0 40px rgba(124,58,237,0.4)',
+              cursor: 'default',
+            }}
           >
-            <FileText className="w-7 h-7 text-white" />
-          </div>
-          <div className="text-base font-bold text-white tracking-wider">THE NEXT STEP</div>
-          <div className="text-[10px] text-white/40 tracking-[2px] mt-0.5">CONSULTING & STRATEGY</div>
-          <p className="text-sm text-slate-500 mt-4">
-            Entrez votre PIN pour accéder
+            <Zap className="w-8 h-8 text-white" strokeWidth={2.5} />
+          </button>
+          <h1 className="text-2xl font-bold text-white mb-1">LudoPilotage</h1>
+          <p className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>
+            Entrez votre code PIN
           </p>
         </div>
 
-        {/* ── PIN pad ── */}
-        {!showSetup && (
-          <div>
-            {/* Dots */}
-            <div className="flex gap-4 justify-center mb-8">
-              {[0, 1, 2, 3].map(i => (
-                <div
-                  key={i}
-                  className={cn(
-                    'w-4 h-4 rounded-full transition-all duration-150',
-                    i < pin.length ? 'bg-blue-500 scale-110' : 'bg-slate-700',
-                  )}
-                />
-              ))}
-            </div>
+        <div className="flex justify-center gap-4 mb-8">
+          {[0,1,2,3].map(i => (
+            <div
+              key={i}
+              className="w-3.5 h-3.5 rounded-full transition-all duration-200"
+              style={{
+                background: i < pin.length ? 'linear-gradient(135deg, #7C3AED, #4F46E5)' : 'rgba(255,255,255,0.12)',
+                transform: i < pin.length ? 'scale(1.3)' : 'scale(1)',
+                boxShadow: i < pin.length ? '0 0 10px rgba(124,58,237,0.5)' : 'none',
+              }}
+            />
+          ))}
+        </div>
 
-            {loading && (
-              <div className="flex justify-center mb-5">
-                <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-              </div>
-            )}
+        {error && (
+          <p className="text-center text-sm font-medium text-red-400 mb-4 animate-fade-in">{error}</p>
+        )}
 
-            {error && (
-              <p className="text-center text-xs text-red-400 mb-4 animate-slide-in">{error}</p>
-            )}
-
-            {/* Keypad */}
-            <div className="grid grid-cols-3 gap-3">
-              {['1','2','3','4','5','6','7','8','9'].map(d => (
-                <button
-                  key={d}
-                  onClick={() => pressPin(d)}
-                  disabled={loading}
-                  className="pin-btn text-center disabled:opacity-40"
-                >
-                  {d}
+        <div className="grid grid-cols-3 gap-3">
+          {DIGITS.map((d, i) => {
+            if (d === '') return <div key={i} />
+            if (d === '⌫') {
+              return (
+                <button key={i} className="pin-btn flex items-center justify-center" onClick={handleDelete}>
+                  <Delete className="w-5 h-5" />
                 </button>
-              ))}
-              <button
-                onClick={() => pressPin('back')}
-                disabled={loading}
-                className="pin-btn text-xl disabled:opacity-40"
-              >
-                ⌫
+              )
+            }
+            return (
+              <button key={i} className="pin-btn" onClick={() => handleDigit(d)}>
+                {d}
               </button>
-              <button
-                onClick={() => pressPin('0')}
-                disabled={loading}
-                className="pin-btn text-center disabled:opacity-40"
-              >
-                0
-              </button>
-              <button
-                onClick={() => pressPin('ok')}
-                disabled={loading || pin.length < 4}
-                className="pin-btn bg-blue-600 border-blue-600 hover:bg-blue-700 disabled:opacity-40 text-center"
-              >
-                OK
-              </button>
-            </div>
+            )
+          })}
+        </div>
+
+        {loading && (
+          <div className="flex justify-center mt-6">
+            <div className="w-5 h-5 rounded-full border-2 border-violet-500/30 border-t-violet-500 animate-spin" />
           </div>
         )}
 
-        {/* ── Admin setup (hidden) ── */}
         {showSetup && (
-          <div className="space-y-4 animate-slide-in">
-            <div className="flex items-center gap-2 text-slate-400 mb-2">
-              <Settings className="w-4 h-4" />
-              <span className="text-xs font-semibold uppercase tracking-wider">Configuration initiale</span>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                Token Airtable
-              </label>
-              <input
-                type="password"
-                value={token}
-                onChange={e => setToken(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSetup()}
-                placeholder="patXXXXXXXXX.XXXXXXXXX"
-                autoFocus
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder:text-slate-600 outline-none focus:border-blue-500 transition-colors"
-              />
-            </div>
-
+          <div
+            className="mt-8 p-4 rounded-2xl animate-slide-up"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+          >
+            <p className="text-xs font-semibold mb-3 uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              Configuration Bootstrap
+            </p>
+            <input
+              type="password"
+              className="input-dark mb-3"
+              placeholder="pat…"
+              value={setupToken}
+              onChange={e => setSetupToken(e.target.value)}
+            />
             <button
-              onClick={handleSetup}
-              disabled={loading || !token}
-              className="w-full py-3 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              onClick={saveSetupToken}
+              className="w-full py-2.5 rounded-xl text-sm font-semibold text-white"
+              style={{ background: 'linear-gradient(135deg, #7C3AED, #4F46E5)' }}
             >
-              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              Enregistrer et continuer
-            </button>
-
-            {setupError && (
-              <p className="text-xs text-red-400 text-center">{setupError}</p>
-            )}
-
-            <button
-              onClick={() => { setShowSetup(false); setSetupError(''); setToken('') }}
-              className="w-full text-xs text-slate-600 hover:text-slate-400 transition-colors text-center"
-            >
-              ← Retour
+              Sauvegarder
             </button>
           </div>
         )}
-
       </div>
     </div>
   )
