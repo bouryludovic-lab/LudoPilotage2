@@ -25,6 +25,33 @@ const EMPTY: FormData = {
   iban: '', prefix: 'F-', pin: '', pinConfirm: '',
 }
 
+// ── Shared field renderer (must be at module scope to avoid focus loss) ──────
+
+function Field({
+  label, value, onChange, type = 'text', placeholder = '', required = false, error = '', hint = '',
+}: {
+  label: string; value: string; onChange: (v: string) => void
+  type?: string; placeholder?: string; required?: boolean; error?: string; hint?: string
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.5)' }}>
+        {label}{required && <span className="text-violet-400 ml-0.5">*</span>}
+      </label>
+      <input
+        type={type}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="input-dark w-full"
+        style={error ? { borderColor: 'rgba(248,113,113,0.6)' } : {}}
+      />
+      {hint  && <p className="mt-1 text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{hint}</p>}
+      {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
+    </div>
+  )
+}
+
 export default function SignupPage() {
   const router   = useRouter()
   const [step, setStep]       = useState<Step>('account')
@@ -99,33 +126,6 @@ export default function SignupPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  // ── Shared field renderer ─────────────────────────────────────────────────
-
-  function Field({
-    label, value, onChange, type = 'text', placeholder = '', required = false, error = '', hint = '',
-  }: {
-    label: string; value: string; onChange: (v: string) => void
-    type?: string; placeholder?: string; required?: boolean; error?: string; hint?: string
-  }) {
-    return (
-      <div>
-        <label className="block text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          {label}{required && <span className="text-violet-400 ml-0.5">*</span>}
-        </label>
-        <input
-          type={type}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          placeholder={placeholder}
-          className="input-dark w-full"
-          style={error ? { borderColor: 'rgba(248,113,113,0.6)' } : {}}
-        />
-        {hint  && <p className="mt-1 text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{hint}</p>}
-        {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
-      </div>
-    )
   }
 
   return (
