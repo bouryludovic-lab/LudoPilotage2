@@ -44,6 +44,33 @@ export interface Client {
   userEmail?: string
 }
 
+export interface InvoiceDesign {
+  /** Header background color, hex e.g. "#1a2744" */
+  primaryColor: string
+  /** Badge / accent color, hex e.g. "#2563eb" */
+  accentColor:  string
+  /** Tagline shown under company name */
+  tagline:      string
+  /** Bank institution name */
+  bankName:     string
+  /** BIC / SWIFT code */
+  bic:          string
+  /** Account holder (if different from nom) */
+  titulaire:    string
+  /** Extra RIB info: "Banque: X | Guichet: Y | Compte: Z | Clé RIB: W" */
+  bankDetails:  string
+}
+
+export const DEFAULT_DESIGN: InvoiceDesign = {
+  primaryColor: '#1a2744',
+  accentColor:  '#2563eb',
+  tagline:      'CONSULTING & STRATEGY',
+  bankName:     '',
+  bic:          '',
+  titulaire:    '',
+  bankDetails:  '',
+}
+
 export interface Profil {
   atId?: string
   nom: string
@@ -58,6 +85,8 @@ export interface Profil {
   webhook?: string
   ghToken?: string
   claudeKey?: string
+  /** Invoice visual design & bank details */
+  design?: InvoiceDesign
 }
 
 export interface Config {
@@ -133,74 +162,79 @@ export interface ChatMessage {
   timestamp: string
 }
 
-// ─── Airtable Config ──────────────────────────────────────────────────────────
+// ─── Invoice template (defaults for new invoices, stored in localStorage) ────
+
+export interface InvoiceTemplate {
+  paiement:    string
+  echeanceIdx: number
+  notes:       string
+  lignes:      LineItem[]
+}
+
+// ─── Airtable Config ─────────────────────────────────────────────────────────
 
 export const AT_BASE = 'appdpkBZRuqEWgOwB'
 
-// Core tables: OLD IDs (existing data + field IDs)
-// New tables: NEW IDs (new features, use field names)
+// New tables (fresh, use field names)
 export const AT_TABLES = {
-  // ── existing tables with real data ──
-  profils:      'tblrBTOVI4Vtyw7Yu',   // old profil table
-  factures:     'tblg4GSn4VYEWym7U',   // old factures table
-  clients:      'tblhyDbRE9EsehF8P',   // old clients table
-  // ── new tables for new modules ──
+  profils:      'tblxiuLqflhdTdW6n',
+  factures:     'tbl23gpQ2ypeXRymQ',
+  clients:      'tblMJYQpS4iqz9MJt',
   hub_messages: 'tblYMMsyFXwRh9m6T',
   coaching:     'tblmpUCHUkQXhbypC',
 } as const
 
-// Field IDs for existing tables (returnFieldsByFieldId=true)
-// Field names for new tables (no returnFieldsByFieldId)
+// Field names for new tables (no field ID mapping needed)
 export const AT_FIELDS = {
+  profils: {
+    nom:       'Name',
+    email:     'email',
+    siret:     'siret',
+    adresse:   'adresse',
+    tel:       'tel',
+    iban:      'iban',
+    prefix:    'prefix',
+    pin:       'pin',
+    webhook:   'webhook',
+    gh_token:  'gh_token',
+    claude_key:'claude_key',
+  },
   factures: {
-    num:         'fldfWxfpMbfDx8C4r',
-    client_nom:  'fldNfyOjAR0l0J26A',   // was "client"
-    client_email:'fld5HBQXkvPuCuy0S',   // was "email"
-    montant:     'fldcDOmXjgv5lcxUu',
-    date:        'fldLKwukDFcqDTBcN',
-    echeance:    'fldjDzETRbstPdDqG',
-    statut:      'fld0dmKRy5LF17l8G',
-    prestation:  'fldqN7CRQPzspMWjl',
-    paiement:    'fldO41dH1Y4Z7Nf5E',
-    notes:       'fldJphY2HZEcLyU8U',
-    email_envoye:'fldQQFX8GjgST3GoH',
-    date_envoi:  'fldRrEv5qZuSRKNQG',
-    pdf:        'fld0STwue4xaMjOwX',
-    pdf_url:    'fldWERkkMOXVg6efx',
+    num:         'Name',
+    client_nom:  'client_nom',
+    client_email:'client_email',
+    montant:     'montant',
+    date:        'date',
+    echeance:    'echeance',
+    statut:      'statut',
+    prestation:  'prestation',
+    paiement:    'paiement',
+    notes:       'notes',
+    email_envoye:'email_envoye',
+    date_envoi:  'date_envoi',
+    pdf_url:     'pdf_url',
+    user_email:  'user_email',
   },
   clients: {
-    nom:     'fldKAzAwGwPPtAmR0',
-    email:   'fld8N9FpM3QlyXBxI',
-    tel:     'fldklBTwFzp1G5CE5',
-    adresse: 'fldOGf87J5w3nYIQ5',
-    siret:   'fldxzOntFLchVyIJb',
-    ca:      'fldhTrfiVkr2uImEN',
-    notes:   'fldjKYVeJC6gnlRIb',
+    nom:       'Name',
+    email:     'email',
+    tel:       'tel',
+    adresse:   'adresse',
+    siret:     'siret',
+    notes:     'notes',
+    user_email:'user_email',
   },
-  profils: {
-    nom:     'fldNgVkNEOVtWfFdZ',
-    siret:   'fld2zcuPKXeIDnrYJ',
-    adresse: 'fld1NSImbC9MhFlwr',
-    email:   'fld7WhHvhrRDHeJ75',
-    tel:     'fldthrvLySFe5e5CR',
-    iban:    'fldWeehG4d2TibX1p',
-    prefix:  'fld7qz7VqdYpdjcVf',
-    pin:     'fldlA797JhQZDCWPb',
-    token:   'fldWDPsM4ssVgaq2e',
-    logo:    'fldLOGO00000000001',
-  },
-  // New tables use field names (no field IDs)
   hub_messages: {
-    name:            'Name',
-    source:          'source',
-    author:          'author',
-    content:         'content',
-    date:            'date',
-    priority:        'priority',
-    read:            'read',
-    tags:            'tags',
-    user_email:      'user_email',
-    action_required: 'action_required',
+    name:           'Name',
+    source:         'source',
+    author:         'author',
+    content:        'content',
+    date:           'date',
+    priority:       'priority',
+    read:           'read',
+    tags:           'tags',
+    user_email:     'user_email',
+    action_required:'action_required',
   },
   coaching: {
     student_name:  'Name',

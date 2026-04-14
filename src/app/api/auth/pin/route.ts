@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 /**
- * PIN login against new profils table.
+ * PIN login against the profils table (field names).
  * Client sends { pin }.
  * Returns { ok, userEmail, profil } or { ok: false, error }.
  */
@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   try {
     const { pin } = await req.json()
 
-    if (!pin || pin.length !== 4) {
+    if (!pin || String(pin).length !== 4) {
       return NextResponse.json({ ok: false, error: 'PIN invalide' }, { status: 400 })
     }
 
@@ -18,10 +18,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Token non configuré' }, { status: 401 })
     }
 
-    // Fetch all profils, find matching PIN
     const { AT_BASE, AT_TABLES, AT_FIELDS } = await import('@/lib/types')
-    // returnFieldsByFieldId=true because old table uses field IDs
-    const url = `https://api.airtable.com/v0/${AT_BASE}/${AT_TABLES.profils}?pageSize=100&returnFieldsByFieldId=true`
+    const F = AT_FIELDS.profils
+
+    // Filter directly by PIN — much faster than fetching all records
+    const url = `https://api.airtable.com/v0/${AT_BASE}/${AT_TABLES.profils}` +
+      `?filterByFormula=${encodeURIComponent(`{${F.pin}}="${pin}"`)}&pageSize=5`
+
     const r = await fetch(url, {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     })
@@ -33,25 +36,27 @@ export async function POST(req: NextRequest) {
     const data = await r.json()
     const records: Array<{ id: string; fields: Record<string, unknown> }> = data.records ?? []
 
-    for (const rec of records) {
-      const storedPin = String(rec.fields[AT_FIELDS.profils.pin] ?? '')
-      if (storedPin === pin) {
-        const userEmail = String(rec.fields[AT_FIELDS.profils.email] ?? '')
-        const profil = {
-          atId:    rec.id,
-          nom:     String(rec.fields[AT_FIELDS.profils.nom]     ?? ''),
-          email:   userEmail,
-          siret:   String(rec.fields[AT_FIELDS.profils.siret]   ?? ''),
-          adresse: String(rec.fields[AT_FIELDS.profils.adresse] ?? ''),
-          tel:     String(rec.fields[AT_FIELDS.profils.tel]     ?? ''),
-          iban:    String(rec.fields[AT_FIELDS.profils.iban]    ?? ''),
-          prefix:  String(rec.fields[AT_FIELDS.profils.prefix]  ?? 'F-'),
-        }
-        return NextResponse.json({ ok: true, userEmail, profil })
-      }
+    if (records.length === 0) {
+      return NextResponse.json({ ok: false, error: 'PIN incorrect' })
     }
 
-    return NextResponse.json({ ok: false, error: 'PIN incorrect' })
+    const rec = records[0]
+    const f   = rec.fields
+    const userEmail = String(f[F.email] ?? '')
+    const profil = {
+      atId:    rec.id,
+      nom:     String(f[F.nom]     ?? ''),
+      email:   userEmail,
+      siret:   String(f[F.siret]   ?? ''),
+      adresse: String(f[F.adresse] ?? ''),
+      tel:     String(f[F.tel]     ?? ''),
+      iban:    String(f[F.iban]    ?? ''),
+      prefix:  String(f[F.prefix]  ?? 'F-'),
+      webhook: f[F.webhook]  ? String(f[F.webhook])  : undefined,
+      ghToken: f[F.gh_token] ? String(f[F.gh_token]) : undefined,
+    }
+
+    return NextResponse.json({ ok: true, userEmail, profil })
   } catch (e) {
     console.error('[auth/pin]', e)
     return NextResponse.json({ ok: false, error: 'Erreur serveur' }, { status: 500 })

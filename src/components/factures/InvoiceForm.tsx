@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Plus, Trash2, Save } from 'lucide-react'
-import { Input, Select, Textarea } from '@/components/ui/Input'
+import { Select, Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { useAppStore } from '@/store'
 import { createFacture } from '@/lib/airtable'
+import { storage } from '@/lib/storage'
 import { generateInvoiceNum, addDays, ECHEANCE_OPTIONS, formatEur, uid } from '@/lib/utils'
 import type { Invoice, LineItem } from '@/lib/types'
 
@@ -19,20 +20,44 @@ function emptyLine(): LineItemRow {
   return { key: uid(), desc: '', qte: 1, pu: 0 }
 }
 
+const CARD = {
+  background: 'rgba(255,255,255,0.03)',
+  border: '1px solid rgba(255,255,255,0.07)',
+}
+
+const SECTION_TITLE = {
+  color: 'rgba(255,255,255,0.6)',
+  borderBottom: '1px solid rgba(255,255,255,0.06)',
+}
+
 export function InvoiceForm() {
   const router   = useRouter()
   const { factures, clients, profil, addFacture } = useAppStore()
 
   const today = new Date().toISOString().split('T')[0]
 
+  // Load template defaults on mount
   const [clientId,      setClientId]      = useState('')
   const [date,          setDate]          = useState(today)
-  const [echeanceIdx,   setEcheanceIdx]   = useState(2) // 30 jours
+  const [echeanceIdx,   setEcheanceIdx]   = useState(2)
   const [paiement,      setPaiement]      = useState('Virement bancaire')
   const [notes,         setNotes]         = useState('')
   const [lines,         setLines]         = useState<LineItemRow[]>([emptyLine()])
   const [saving,        setSaving]        = useState(false)
   const [errors,        setErrors]        = useState<Record<string, string>>({})
+  const [templateLoaded, setTemplateLoaded] = useState(false)
+
+  useEffect(() => {
+    if (templateLoaded) return
+    const t = storage.getTemplate()
+    setEcheanceIdx(t.echeanceIdx)
+    setPaiement(t.paiement)
+    setNotes(t.notes)
+    if (t.lignes.length > 0 && t.lignes.some(l => l.desc || l.pu > 0)) {
+      setLines(t.lignes.map(l => ({ ...l, key: uid() })))
+    }
+    setTemplateLoaded(true)
+  }, [templateLoaded])
 
   const selectedClient = clients.find(c => c.id === clientId)
   const echeanceOpt    = ECHEANCE_OPTIONS[echeanceIdx]
@@ -96,8 +121,7 @@ export function InvoiceForm() {
       addFacture(invoice)
       toast.success(`Facture ${num} créée`)
       router.push('/factures')
-    } catch (e) {
-      // Save locally even if Airtable fails
+    } catch {
       addFacture(invoice)
       toast.warning('Facture sauvegardée localement (sync Airtable échouée)')
       router.push('/factures')
@@ -110,77 +134,103 @@ export function InvoiceForm() {
     <div className="max-w-3xl mx-auto space-y-4">
 
       {/* Client & Date */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-card">
-        <h2 className="text-sm font-semibold text-slate-700 mb-4 pb-3 border-b border-slate-100">Informations</h2>
+      <div className="rounded-2xl p-5" style={CARD}>
+        <h2 className="text-sm font-semibold mb-4 pb-3" style={SECTION_TITLE}>Informations</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Select
-            label="Client"
-            required
-            value={clientId}
-            onChange={e => setClientId(e.target.value)}
-            error={errors.client}
-          >
-            <option value="">Sélectionner un client…</option>
-            {clients.map(c => (
-              <option key={c.id} value={c.id}>{c.nom}</option>
-            ))}
-          </Select>
 
-          {selectedClient && (
-            <div className="bg-slate-50 rounded-lg p-3 text-xs text-slate-600 self-end">
-              <div className="font-medium text-slate-800 mb-0.5">{selectedClient.nom}</div>
-              {selectedClient.email   && <div>{selectedClient.email}</div>}
-              {selectedClient.adresse && <div className="truncate">{selectedClient.adresse}</div>}
+          {/* Client select */}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.45)' }}>
+              Client <span className="text-violet-400">*</span>
+            </label>
+            <select
+              value={clientId}
+              onChange={e => setClientId(e.target.value)}
+              className="input-dark w-full"
+              style={errors.client ? { borderColor: 'rgba(248,113,113,0.6)' } : {}}
+            >
+              <option value="">Sélectionner un client…</option>
+              {clients.map(c => (
+                <option key={c.id} value={c.id}>{c.nom}</option>
+              ))}
+            </select>
+            {errors.client && <p className="mt-1 text-xs text-red-400">{errors.client}</p>}
+          </div>
+
+          {selectedClient ? (
+            <div className="rounded-xl p-3 text-xs self-end"
+              style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.15)' }}>
+              <div className="font-semibold mb-0.5 text-violet-300">{selectedClient.nom}</div>
+              {selectedClient.email   && <div style={{ color: 'rgba(255,255,255,0.5)' }}>{selectedClient.email}</div>}
+              {selectedClient.adresse && <div className="truncate" style={{ color: 'rgba(255,255,255,0.4)' }}>{selectedClient.adresse}</div>}
             </div>
-          )}
+          ) : <div />}
 
-          <Input
-            label="Date de facturation"
-            type="date"
-            value={date}
-            onChange={e => setDate(e.target.value)}
-            required
-            error={errors.date}
-          />
+          {/* Date */}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.45)' }}>
+              Date de facturation <span className="text-violet-400">*</span>
+            </label>
+            <input
+              type="date"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+              className="input-dark w-full"
+              style={errors.date ? { borderColor: 'rgba(248,113,113,0.6)' } : {}}
+            />
+            {errors.date && <p className="mt-1 text-xs text-red-400">{errors.date}</p>}
+          </div>
 
-          <Select
-            label="Échéance de paiement"
-            value={String(echeanceIdx)}
-            onChange={e => setEcheanceIdx(Number(e.target.value))}
-          >
-            {ECHEANCE_OPTIONS.map((opt, i) => (
-              <option key={i} value={i}>{opt.label}</option>
-            ))}
-          </Select>
+          {/* Echeance */}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.45)' }}>
+              Échéance de paiement
+            </label>
+            <select
+              value={String(echeanceIdx)}
+              onChange={e => setEcheanceIdx(Number(e.target.value))}
+              className="input-dark w-full"
+            >
+              {ECHEANCE_OPTIONS.map((opt, i) => (
+                <option key={i} value={i}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
 
-          <Select
-            label="Mode de paiement"
-            value={paiement}
-            onChange={e => setPaiement(e.target.value)}
-          >
-            <option>Virement bancaire</option>
-            <option>Chèque</option>
-            <option>Espèces</option>
-            <option>Carte bancaire</option>
-            <option>PayPal</option>
-          </Select>
+          {/* Paiement */}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.45)' }}>
+              Mode de paiement
+            </label>
+            <select
+              value={paiement}
+              onChange={e => setPaiement(e.target.value)}
+              className="input-dark w-full"
+            >
+              <option>Virement bancaire</option>
+              <option>Chèque</option>
+              <option>Espèces</option>
+              <option>Carte bancaire</option>
+              <option>PayPal</option>
+            </select>
+          </div>
         </div>
       </div>
 
       {/* Lines */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-card">
-        <h2 className="text-sm font-semibold text-slate-700 mb-4 pb-3 border-b border-slate-100">Prestations</h2>
+      <div className="rounded-2xl p-5" style={CARD}>
+        <h2 className="text-sm font-semibold mb-4 pb-3" style={SECTION_TITLE}>Prestations</h2>
 
         {errors.lines && (
-          <p className="text-xs text-red-500 mb-3">{errors.lines}</p>
+          <p className="text-xs text-red-400 mb-3">{errors.lines}</p>
         )}
 
         <div className="space-y-2">
           {/* Header */}
           <div className="grid grid-cols-[1fr_72px_110px_36px] gap-2 px-1">
-            <span className="text-xs font-medium text-slate-500">Description</span>
-            <span className="text-xs font-medium text-slate-500">Qté</span>
-            <span className="text-xs font-medium text-slate-500">Prix unit. HT</span>
+            <span className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.3)' }}>Description</span>
+            <span className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.3)' }}>Qté</span>
+            <span className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.3)' }}>Prix unit. HT</span>
             <span />
           </div>
 
@@ -191,14 +241,14 @@ export function InvoiceForm() {
                 value={line.desc}
                 onChange={e => updateLine(line.key, 'desc', e.target.value)}
                 placeholder="Description de la prestation"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-[13px] bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 shadow-sm"
+                className="input-dark w-full"
               />
               <input
                 type="number"
                 min={1}
                 value={line.qte}
                 onChange={e => updateLine(line.key, 'qte', e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-2.5 py-2 text-[13px] bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 shadow-sm text-center"
+                className="input-dark w-full text-center"
               />
               <input
                 type="number"
@@ -207,12 +257,15 @@ export function InvoiceForm() {
                 value={line.pu || ''}
                 onChange={e => updateLine(line.key, 'pu', e.target.value)}
                 placeholder="0.00"
-                className="w-full border border-slate-300 rounded-lg px-2.5 py-2 text-[13px] bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 shadow-sm"
+                className="input-dark w-full"
               />
               <button
                 onClick={() => lines.length > 1 ? removeLine(line.key) : undefined}
                 disabled={lines.length <= 1}
-                className="w-9 h-9 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-red-500 hover:bg-red-50 hover:border-red-200 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                className="w-9 h-9 flex items-center justify-center rounded-xl transition-colors disabled:opacity-30"
+                style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.3)' }}
+                onMouseEnter={e => { if (lines.length > 1) (e.currentTarget as HTMLButtonElement).style.color = '#F87171' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.3)' }}
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -221,40 +274,46 @@ export function InvoiceForm() {
 
           <button
             onClick={() => setLines(prev => [...prev, emptyLine()])}
-            className="w-full py-2.5 border border-dashed border-slate-300 rounded-lg text-[13px] text-slate-400 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors flex items-center justify-center gap-1.5 mt-2"
+            className="w-full py-2.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-1.5 mt-2"
+            style={{ border: '1px dashed rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.35)' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(124,58,237,0.4)'; (e.currentTarget as HTMLButtonElement).style.color = '#A78BFA' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.12)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.35)' }}
           >
             <Plus className="w-3.5 h-3.5" /> Ajouter une ligne
           </button>
         </div>
 
-        {/* Totaux */}
-        <div className="mt-4 bg-slate-50 rounded-lg p-3.5 border border-slate-200 space-y-1.5">
-          <div className="flex justify-between text-sm text-slate-500">
+        {/* Total */}
+        <div className="mt-4 rounded-xl p-3.5 space-y-1.5"
+          style={{ background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.12)' }}>
+          <div className="flex justify-between text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>
             <span>Sous-total HT</span>
             <span className="font-medium tabular-nums">{formatEur(subtotal)}</span>
           </div>
-          <div className="flex justify-between text-xs text-slate-400">
+          <div className="flex justify-between text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
             <span>TVA</span>
             <span>Non applicable (auto-entrepreneur)</span>
           </div>
-          <div className="flex justify-between text-base font-bold text-slate-900 pt-2 mt-1 border-t border-slate-200">
+          <div className="flex justify-between text-base font-bold pt-2 mt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', color: 'white' }}>
             <span>Total TTC</span>
-            <span className="text-blue-600 tabular-nums">{formatEur(subtotal)}</span>
+            <span className="text-violet-300 tabular-nums">{formatEur(subtotal)}</span>
           </div>
         </div>
 
-        <p className="text-xs text-slate-400 mt-2">
+        <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.25)' }}>
           TVA non applicable, article 293B du CGI
         </p>
       </div>
 
       {/* Notes */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-card">
-        <Textarea
-          label="Notes / mentions légales"
+      <div className="rounded-2xl p-5" style={CARD}>
+        <h2 className="text-sm font-semibold mb-3 pb-3" style={SECTION_TITLE}>Notes / mentions légales</h2>
+        <textarea
           value={notes}
           onChange={e => setNotes(e.target.value)}
           placeholder="Notes additionnelles pour le client…"
+          rows={3}
+          className="input-dark w-full resize-none"
         />
       </div>
 

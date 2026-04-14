@@ -29,10 +29,10 @@ interface AppState {
   setClients:   (c: Client[]) => void
 
   setProfil: (p: Profil) => void
-  setConfig:  (c: Config) => void
+  setConfig: (c: Config) => void
 }
 
-// ─── Server-side sync via /api/airtable proxy ─────────────────────────────────
+// ─── Server-side sync via proxy ───────────────────────────────────────────────
 
 async function atProxy(body: Record<string, unknown>) {
   const res = await fetch('/api/airtable', {
@@ -44,20 +44,23 @@ async function atProxy(body: Record<string, unknown>) {
   return res.json()
 }
 
-type ATRecord = { id: string; fields: Record<string, unknown> }
-
 async function serverSyncAll(): Promise<{ factures: Invoice[]; clients: Client[]; profil: Profil | null }> {
   const { AT_TABLES, AT_FIELDS } = await import('@/lib/types')
   const F = AT_FIELDS
 
-  // Old tables: use returnFieldsByFieldId=true (no useFieldNames)
+  // Detect user email from storage
+  const userEmail = typeof window !== 'undefined' ? (localStorage.getItem('at_token') ?? '') : ''
+
   const [facturesData, clientsData, profilData] = await Promise.all([
-    atProxy({ table: AT_TABLES.factures, method: 'GET' }),
-    atProxy({ table: AT_TABLES.clients,  method: 'GET' }),
-    atProxy({ table: AT_TABLES.profils,  method: 'GET' }),
+    atProxy({ table: AT_TABLES.factures, method: 'GET', useFieldNames: true,
+      query: userEmail ? `filterByFormula=${encodeURIComponent(`{${F.factures.user_email}}="${userEmail}"`)}` : undefined }),
+    atProxy({ table: AT_TABLES.clients,  method: 'GET', useFieldNames: true,
+      query: userEmail ? `filterByFormula=${encodeURIComponent(`{${F.clients.user_email}}="${userEmail}"`)}` : undefined }),
+    atProxy({ table: AT_TABLES.profils,  method: 'GET', useFieldNames: true,
+      query: userEmail ? `filterByFormula=${encodeURIComponent(`{${F.profils.email}}="${userEmail}"`)}` : undefined }),
   ])
 
-  const factures: Invoice[] = (facturesData.records ?? []).map((rec: ATRecord) => {
+  const factures: Invoice[] = (facturesData.records ?? []).map((rec: { id: string; fields: Record<string, unknown> }) => {
     const f = rec.fields
     let lignes: Invoice['lignes'] = []
     try {
@@ -66,28 +69,28 @@ async function serverSyncAll(): Promise<{ factures: Invoice[]; clients: Client[]
     } catch {}
     return {
       id: rec.id, atId: rec.id,
-      num:           String(f[F.factures.num]          ?? ''),
-      date:          String(f[F.factures.date]         ?? ''),
-      echeance:      String(f[F.factures.echeance]     ?? ''),
+      num:         String(f[F.factures.num]          ?? ''),
+      date:        String(f[F.factures.date]         ?? ''),
+      echeance:    String(f[F.factures.echeance]     ?? ''),
       echeanceLabel: '',
-      clientId:      '',
-      clientNom:     String(f[F.factures.client_nom]   ?? ''),
-      clientEmail:   String(f[F.factures.client_email] ?? ''),
-      clientAdresse: '',
-      clientSiret:   '',
-      paiement:      String(f[F.factures.paiement]     ?? ''),
-      iban:          '',
-      notes:         String(f[F.factures.notes]        ?? ''),
+      clientId:    '',
+      clientNom:   String(f[F.factures.client_nom]   ?? ''),
+      clientEmail: String(f[F.factures.client_email] ?? ''),
+      clientAdresse: '', clientSiret: '',
+      paiement:    String(f[F.factures.paiement]     ?? ''),
+      iban: '',
+      notes:       String(f[F.factures.notes]        ?? ''),
       lignes,
-      total:         Number(f[F.factures.montant]      ?? 0),
-      statut:        (String(f[F.factures.statut]      ?? 'pending')) as Invoice['statut'],
-      dateEnvoi:     f[F.factures.date_envoi]  ? String(f[F.factures.date_envoi])  : undefined,
-      pdfUrl:        f[F.factures.pdf_url]     ? String(f[F.factures.pdf_url])     : undefined,
-      emailEnvoye:   Boolean(f[F.factures.email_envoye]),
+      total:       Number(f[F.factures.montant]      ?? 0),
+      statut:      (String(f[F.factures.statut]      ?? 'pending')) as Invoice['statut'],
+      dateEnvoi:   f[F.factures.date_envoi] ? String(f[F.factures.date_envoi]) : undefined,
+      pdfUrl:      f[F.factures.pdf_url]    ? String(f[F.factures.pdf_url])    : undefined,
+      emailEnvoye: Boolean(f[F.factures.email_envoye]),
+      userEmail:   String(f[F.factures.user_email]   ?? ''),
     }
   })
 
-  const clients: Client[] = (clientsData.records ?? []).map((rec: ATRecord) => {
+  const clients: Client[] = (clientsData.records ?? []).map((rec: { id: string; fields: Record<string, unknown> }) => {
     const f = rec.fields
     return {
       id: rec.id, atId: rec.id,
@@ -102,8 +105,14 @@ async function serverSyncAll(): Promise<{ factures: Invoice[]; clients: Client[]
 
   let profil: Profil | null = null
   if ((profilData.records ?? []).length > 0) {
-    const rec = profilData.records[0] as ATRecord
+    const rec = profilData.records[0]
     const f = rec.fields
+    // Parse design JSON if stored as string
+    let design
+    const rawDesign = f['design']
+    if (rawDesign) {
+      try { design = typeof rawDesign === 'string' ? JSON.parse(rawDesign) : rawDesign } catch {}
+    }
     profil = {
       atId:    rec.id,
       nom:     String(f[F.profils.nom]     ?? ''),
@@ -113,6 +122,9 @@ async function serverSyncAll(): Promise<{ factures: Invoice[]; clients: Client[]
       tel:     String(f[F.profils.tel]     ?? ''),
       iban:    String(f[F.profils.iban]    ?? ''),
       prefix:  String(f[F.profils.prefix]  ?? 'F-'),
+      webhook: f[F.profils.webhook]   ? String(f[F.profils.webhook])   : undefined,
+      ghToken: f[F.profils.gh_token]  ? String(f[F.profils.gh_token])  : undefined,
+      design,
     }
   }
 
@@ -147,7 +159,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const localClients  = get().clients.filter(c => !c.atId)
       const merged = {
         factures:   [...factures, ...localFactures],
-        clients:    [...clients,  ...localClients],
+        clients:    [...clients, ...localClients],
         profil:     profil ?? get().profil,
         syncing:    false,
         lastSyncAt: new Date(),

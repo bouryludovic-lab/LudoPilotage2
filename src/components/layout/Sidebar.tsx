@@ -8,19 +8,20 @@ import { storage } from '@/lib/storage'
 import {
   LayoutDashboard, FileText, Users, MessageSquare,
   Bot, ClipboardList, GraduationCap, Settings,
-  LogOut, Zap, User,
+  LogOut, Zap, User, StickyNote,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { href: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard',     group: 'main' },
-  { href: '/factures',      icon: FileText,         label: 'Facturation',   group: 'main', badge: true },
-  { href: '/clients',       icon: Users,            label: 'Clients',       group: 'main' },
-  { href: '/hub',           icon: MessageSquare,    label: 'HUB',           group: 'tools', isNew: true },
-  { href: '/agent',         icon: Bot,              label: 'Agent IA',      group: 'tools', isNew: true },
-  { href: '/formulaires',   icon: ClipboardList,    label: 'Formulaires',   group: 'tools' },
-  { href: '/coaching',      icon: GraduationCap,    label: 'Coaching',      group: 'tools' },
-  { href: '/profil',        icon: User,             label: 'Mon profil',    group: 'bottom' },
-  { href: '/configuration', icon: Settings,         label: 'Configuration', group: 'bottom' },
+  { href: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard',      group: 'main' },
+  { href: '/factures',      icon: FileText,         label: 'Facturation',    group: 'main', badge: true },
+  { href: '/clients',       icon: Users,            label: 'Clients',        group: 'main' },
+  { href: '/facture-type',  icon: StickyNote,       label: 'Modèle facture', group: 'main' },
+  { href: '/hub',           icon: MessageSquare,    label: 'HUB',            group: 'tools', isNew: true },
+  { href: '/agent',         icon: Bot,              label: 'Agent IA',       group: 'tools', isNew: true },
+  { href: '/formulaires',   icon: ClipboardList,    label: 'Formulaires',    group: 'tools' },
+  { href: '/coaching',      icon: GraduationCap,    label: 'Coaching',       group: 'tools' },
+  { href: '/profil',        icon: User,             label: 'Mon profil',     group: 'bottom' },
+  { href: '/configuration', icon: Settings,         label: 'Configuration',  group: 'bottom' },
 ]
 
 export function Sidebar() {

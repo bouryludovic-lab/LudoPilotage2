@@ -2,23 +2,27 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import { Zap, Delete } from 'lucide-react'
 import { storage } from '@/lib/storage'
 import { useAppStore } from '@/store'
 
 export default function LoginPage() {
-  const [pin, setPin]         = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState('')
+  const [pin, setPin]               = useState('')
+  const [loading, setLoading]       = useState(false)
+  const [error, setError]           = useState('')
+  const [stayLoggedIn, setStay]     = useState(true)
   const [logoClicks, setLogoClicks] = useState(0)
   const [showSetup, setShowSetup]   = useState(false)
   const [setupToken, setSetupToken] = useState('')
-  const router = useRouter()
+  const router   = useRouter()
   const setProfil = useAppStore(s => s.setProfil)
 
   useEffect(() => {
     if (storage.isLoggedIn()) router.replace('/dashboard')
+    // Restore user's previous preference
+    setStay(storage.getStayLoggedIn())
   }, [])
 
   const handleDigit = useCallback((d: string) => {
@@ -35,7 +39,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (pin.length === 4) submit(pin)
-  }, [pin])
+  }, [pin])  // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -57,7 +61,7 @@ export default function LoginPage() {
       })
       const data = await res.json()
       if (data.ok) {
-        storage.setToken(data.userEmail || p)
+        storage.setToken(data.userEmail || p, stayLoggedIn)
         if (data.profil) {
           setProfil(data.profil)
           storage.setProfil(data.profil)
@@ -106,6 +110,8 @@ export default function LoginPage() {
       </div>
 
       <div className="relative w-full max-w-[320px] animate-slide-up">
+
+        {/* Logo + title */}
         <div className="flex flex-col items-center mb-10">
           <button
             onClick={handleLogoClick}
@@ -122,8 +128,13 @@ export default function LoginPage() {
           <p className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>
             Entrez votre code PIN
           </p>
+          <Link href="/signup"
+            className="mt-2 text-xs font-medium text-violet-400 hover:text-violet-300 transition-colors">
+            Première connexion ? Créer un compte
+          </Link>
         </div>
 
+        {/* PIN dots */}
         <div className="flex justify-center gap-4 mb-8">
           {[0,1,2,3].map(i => (
             <div
@@ -142,6 +153,7 @@ export default function LoginPage() {
           <p className="text-center text-sm font-medium text-red-400 mb-4 animate-fade-in">{error}</p>
         )}
 
+        {/* Keypad */}
         <div className="grid grid-cols-3 gap-3">
           {DIGITS.map((d, i) => {
             if (d === '') return <div key={i} />
@@ -160,12 +172,41 @@ export default function LoginPage() {
           })}
         </div>
 
+        {/* Stay logged in checkbox */}
+        <div className="flex items-center justify-center gap-2.5 mt-6">
+          <button
+            role="checkbox"
+            aria-checked={stayLoggedIn}
+            onClick={() => setStay(p => !p)}
+            className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-all"
+            style={{
+              background: stayLoggedIn ? 'linear-gradient(135deg, #7C3AED, #4F46E5)' : 'rgba(255,255,255,0.06)',
+              border: stayLoggedIn ? 'none' : '1px solid rgba(255,255,255,0.18)',
+            }}
+          >
+            {stayLoggedIn && (
+              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 12 12">
+                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </button>
+          <span className="text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>
+            Rester connecté
+          </span>
+        </div>
+        <p className="text-center text-[11px] mt-1.5" style={{ color: 'rgba(255,255,255,0.2)' }}>
+          {stayLoggedIn
+            ? 'Votre session sera conservée même après fermeture du navigateur'
+            : 'Votre session expirera à la fermeture de l\'onglet'}
+        </p>
+
         {loading && (
-          <div className="flex justify-center mt-6">
+          <div className="flex justify-center mt-5">
             <div className="w-5 h-5 rounded-full border-2 border-violet-500/30 border-t-violet-500 animate-spin" />
           </div>
         )}
 
+        {/* Bootstrap setup (hidden, 5x logo clicks) */}
         {showSetup && (
           <div
             className="mt-8 p-4 rounded-2xl animate-slide-up"
@@ -190,6 +231,7 @@ export default function LoginPage() {
             </button>
           </div>
         )}
+
       </div>
     </div>
   )
