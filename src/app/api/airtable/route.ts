@@ -45,8 +45,8 @@ export async function POST(req: NextRequest) {
       const records: unknown[] = []
       let offset: string | null = null
       do {
-        const q = 'pageSize=100' + (offset ? '&offset=' + offset : '') + (query ? '&' + query : '')
-        const r = await fetch(atUrl(table, undefined, q), { headers: atHeaders(token) })
+        const qs: string = 'pageSize=100' + (offset ? '&offset=' + offset : '') + (query ? '&' + query : '')
+        const r = await fetch(atUrl(table, undefined, qs), { headers: atHeaders(token) })
         if (!r.ok) return NextResponse.json({ error: `Airtable ${r.status}` }, { status: r.status })
         const d = await r.json()
         records.push(...(d.records ?? []))

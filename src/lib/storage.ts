@@ -30,12 +30,12 @@ function remove(key: string): void {
 
 export const storage = {
   // ── Auth ──────────────────────────────────────────────────────────────────
-  getToken: (): string => localStorage.getItem('at_token') ?? '',
-  setToken: (token: string) => localStorage.setItem('at_token', token),
+  getToken: (): string => typeof window === 'undefined' ? '' : (localStorage.getItem('at_token') ?? ''),
+  setToken: (token: string) => { if (typeof window !== 'undefined') localStorage.setItem('at_token', token) },
   clearToken: () => remove('at_token'),
 
-  getBootstrapToken: (): string => localStorage.getItem('at_bootstrap') ?? '',
-  setBootstrapToken: (token: string) => localStorage.setItem('at_bootstrap', token),
+  getBootstrapToken: (): string => typeof window === 'undefined' ? '' : (localStorage.getItem('at_bootstrap') ?? ''),
+  setBootstrapToken: (token: string) => { if (typeof window !== 'undefined') localStorage.setItem('at_bootstrap', token) },
 
   isLoggedIn: (): boolean => {
     if (typeof window === 'undefined') return false

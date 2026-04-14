@@ -1,7 +1,6 @@
 'use client'
 
-import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { CheckCircle, XCircle, Eye, EyeOff } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
@@ -13,15 +12,23 @@ import { fetchProfilByBootstrapToken } from '@/lib/airtable'
 
 export default function ConfigurationPage() {
   const { config, setConfig } = useAppStore()
-  const [atStatus, setAtStatus]   = useState<'idle' | 'ok' | 'error'>('idle')
-  const [atTesting, setAtTesting] = useState(false)
+  const [atStatus, setAtStatus]     = useState<'idle' | 'ok' | 'error'>('idle')
+  const [atTesting, setAtTesting]   = useState(false)
   const [showTokens, setShowTokens] = useState(false)
   const [saving, setSaving]         = useState(false)
 
-  const [webhook,    setWebhook]    = useState(config.webhook    ?? '')
-  const [claudeKey,  setClaudeKey]  = useState(config.claudeKey  ?? '')
-  const [ghToken,    setGhToken]    = useState(config.ghToken    ?? '')
-  const [atToken,    setAtToken]    = useState(storage.getToken() ?? '')
+  const [webhook,   setWebhook]   = useState(config.webhook   ?? '')
+  const [claudeKey, setClaudeKey] = useState(config.claudeKey ?? '')
+  const [ghToken,   setGhToken]   = useState(config.ghToken   ?? '')
+  const [atToken,   setAtToken]   = useState('')
+
+  // Load token client-side only (localStorage not available during SSR)
+  useEffect(() => {
+    setAtToken(storage.getToken())
+    setWebhook(config.webhook   ?? '')
+    setClaudeKey(config.claudeKey ?? '')
+    setGhToken(config.ghToken   ?? '')
+  }, [])
 
   async function testAirtable() {
     if (!atToken) { toast.error('Token Airtable requis'); return }
