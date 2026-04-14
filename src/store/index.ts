@@ -107,6 +107,12 @@ async function serverSyncAll(): Promise<{ factures: Invoice[]; clients: Client[]
   if ((profilData.records ?? []).length > 0) {
     const rec = profilData.records[0]
     const f = rec.fields
+    // Parse design JSON if stored as string
+    let design
+    const rawDesign = f['design']
+    if (rawDesign) {
+      try { design = typeof rawDesign === 'string' ? JSON.parse(rawDesign) : rawDesign } catch {}
+    }
     profil = {
       atId:    rec.id,
       nom:     String(f[F.profils.nom]     ?? ''),
@@ -118,6 +124,7 @@ async function serverSyncAll(): Promise<{ factures: Invoice[]; clients: Client[]
       prefix:  String(f[F.profils.prefix]  ?? 'F-'),
       webhook: f[F.profils.webhook]   ? String(f[F.profils.webhook])   : undefined,
       ghToken: f[F.profils.gh_token]  ? String(f[F.profils.gh_token])  : undefined,
+      design,
     }
   }
 

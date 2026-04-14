@@ -1,249 +1,286 @@
-import type { Invoice, Profil } from './types'
+import type { Invoice, Profil, InvoiceDesign } from './types'
+import { DEFAULT_DESIGN } from './types'
 import { formatEur, formatDate } from './utils'
 
-// jsPDF is loaded dynamically to avoid SSR issues
+// ─── jsPDF dynamic import (avoids SSR issues) ─────────────────────────────────
 async function getJsPDF() {
   const { jsPDF } = await import('jspdf')
   return jsPDF
 }
 
-// ─── Color palette ────────────────────────────────────────────────────────────
-const C = {
-  navy:       [26,  39,  68] as [number, number, number],
-  blue:       [37, 99,  235] as [number, number, number],
-  blueLight:  [59, 130, 246] as [number, number, number],
-  slate900:   [15,  23,  42] as [number, number, number],
-  slate700:   [51,  65,  85] as [number, number, number],
-  slate500:   [100, 116, 139] as [number, number, number],
-  slate300:   [203, 213, 225] as [number, number, number],
-  slate100:   [241, 245, 249] as [number, number, number],
-  white:      [255, 255, 255] as [number, number, number],
-  green:      [21, 128,  61] as [number, number, number],
-  greenBg:    [240, 253, 244] as [number, number, number],
+type Doc = InstanceType<Awaited<ReturnType<typeof getJsPDF>>>
+
+// ─── Hex → [R,G,B] ───────────────────────────────────────────────────────────
+function hex(h: string): [number, number, number] {
+  const s = h.replace('#', '')
+  const n = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
 }
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
-function rect(doc: InstanceType<Awaited<ReturnType<typeof getJsPDF>>>, x: number, y: number, w: number, h: number, color: [number, number, number], style: 'F' | 'S' | 'FD' = 'F') {
+// Darken a hex color by a fraction (0–1)
+function darken(h: string, amount = 0.2): [number, number, number] {
+  const [r, g, b] = hex(h)
+  return [Math.round(r * (1 - amount)), Math.round(g * (1 - amount)), Math.round(b * (1 - amount))]
+}
+
+// ─── Neutral palette (doesn't change with design) ────────────────────────────
+const N = {
+  slate900:  [15,  23,  42]  as [number, number, number],
+  slate700:  [51,  65,  85]  as [number, number, number],
+  slate500:  [100, 116, 139] as [number, number, number],
+  slate300:  [203, 213, 225] as [number, number, number],
+  slate100:  [241, 245, 249] as [number, number, number],
+  white:     [255, 255, 255] as [number, number, number],
+}
+
+// ─── Drawing helpers ──────────────────────────────────────────────────────────
+function fillRect(doc: Doc, x: number, y: number, w: number, h: number, color: [number, number, number]) {
   doc.setFillColor(...color)
-  doc.setDrawColor(...color)
-  doc.rect(x, y, w, h, style)
+  doc.rect(x, y, w, h, 'F')
 }
 
-function text(doc: InstanceType<Awaited<ReturnType<typeof getJsPDF>>>, str: string, x: number, y: number, opts?: { size?: number; color?: [number, number, number]; bold?: boolean; align?: 'left' | 'right' | 'center' }) {
+function txt(doc: Doc, str: string, x: number, y: number, opts?: {
+  size?:  number
+  color?: [number, number, number]
+  bold?:  boolean
+  align?: 'left' | 'right' | 'center'
+}) {
+  if (!str) return
   doc.setFontSize(opts?.size ?? 9)
-  doc.setTextColor(...(opts?.color ?? C.slate700))
+  doc.setTextColor(...(opts?.color ?? N.slate700))
   doc.setFont('helvetica', opts?.bold ? 'bold' : 'normal')
   doc.text(str, x, y, { align: opts?.align ?? 'left' })
 }
 
-// ─── Main generator ───────────────────────────────────────────────────────────
+function hline(doc: Doc, x1: number, y: number, x2: number, color: [number, number, number], lw = 0.3) {
+  doc.setDrawColor(...color)
+  doc.setLineWidth(lw)
+  doc.line(x1, y, x2, y)
+}
 
+// ─── Main generator ───────────────────────────────────────────────────────────
 export async function generateInvoicePdf(invoice: Invoice, profil: Profil): Promise<string> {
   const JsPDF = await getJsPDF()
-  const doc = new JsPDF({ unit: 'mm', format: 'a4' })
+  const doc   = new JsPDF({ unit: 'mm', format: 'a4' })
 
-  const PW = 210  // page width
-  const M  = 15   // margin
+  const d: InvoiceDesign = { ...DEFAULT_DESIGN, ...(profil.design ?? {}) }
+  const PRIMARY = hex(d.primaryColor)
+  const ACCENT  = hex(d.accentColor)
+  const ACCENT_D = darken(d.accentColor, 0.15)
 
-  // ── 1. Header band ──────────────────────────────────────────────────────────
-  rect(doc, 0, 0, PW, 40, C.navy)
+  const PW = 210
+  const M  = 15
 
-  // Logo area (left)
+  // ══════════════════════════════════════════════════════════════════════════
+  // 1. HEADER BAND
+  // ══════════════════════════════════════════════════════════════════════════
+  fillRect(doc, 0, 0, PW, 42, PRIMARY)
+
+  // Logo or text fallback
   if (profil.logo) {
     try {
-      const ext = profil.logo.includes('png') ? 'PNG' : 'JPEG'
-      doc.addImage(profil.logo, ext, M, 8, 24, 24)
+      const ext = profil.logo.startsWith('data:image/png') ? 'PNG' : 'JPEG'
+      doc.addImage(profil.logo, ext, M, 8, 26, 26)
     } catch {}
   } else {
-    // Text logo fallback
-    rect(doc, M, 8, 28, 24, C.blue)
-    text(doc, 'TNS', M + 14, 22, { size: 13, color: C.white, bold: true, align: 'center' })
+    // Square logo placeholder with accent color
+    fillRect(doc, M, 8, 28, 26, ACCENT)
+    const initials = (profil.nom || 'TNS').split(' ').map(w => w[0]).join('').slice(0, 3).toUpperCase()
+    txt(doc, initials, M + 14, 23.5, { size: 12, color: N.white, bold: true, align: 'center' })
   }
 
   // Company name + tagline
-  text(doc, profil.nom || 'THE NEXT STEP', M + 34, 16, { size: 13, color: C.white, bold: true })
-  text(doc, 'CONSULTING & STRATEGY', M + 34, 22, { size: 7.5, color: [148, 163, 184] })
+  const textX = M + 34
+  txt(doc, (profil.nom || '').toUpperCase(), textX, 18, { size: 13, color: N.white, bold: true })
+  txt(doc, d.tagline, textX, 24.5, { size: 7.5, color: [148, 163, 184] })
   if (profil.siret) {
-    text(doc, `SIRET ${profil.siret}`, M + 34, 28, { size: 7.5, color: [148, 163, 184] })
+    txt(doc, `SIRET ${profil.siret}`, textX, 30, { size: 7, color: [100, 116, 139] })
   }
 
-  // Invoice badge (right)
-  rect(doc, PW - M - 50, 10, 50, 20, C.blue)
-  text(doc, 'FACTURE', PW - M - 25, 18, { size: 9, color: C.white, bold: true, align: 'center' })
-  text(doc, invoice.num, PW - M - 25, 25, { size: 9.5, color: C.white, bold: true, align: 'center' })
+  // Invoice badge (top-right)
+  fillRect(doc, PW - M - 48, 10, 48, 22, ACCENT)
+  txt(doc, 'FACTURE', PW - M - 24, 19, { size: 9, color: N.white, bold: true, align: 'center' })
+  txt(doc, invoice.num, PW - M - 24, 26, { size: 9.5, color: N.white, bold: true, align: 'center' })
 
-  // ── 2. Date row ─────────────────────────────────────────────────────────────
-  rect(doc, 0, 40, PW, 10, C.slate100)
-  text(doc, `Date d'émission : ${formatDate(invoice.date)}`, M, 46.5, { size: 8, color: C.slate700 })
-  text(doc, `Échéance : ${formatDate(invoice.echeance)} (${invoice.echeanceLabel || '30 jours'})`, PW / 2, 46.5, { size: 8, color: C.slate700 })
-  text(doc, `Paiement : ${invoice.paiement}`, PW - M, 46.5, { size: 8, color: C.slate700, align: 'right' })
+  // ══════════════════════════════════════════════════════════════════════════
+  // 2. DATE / ECHÉANCE / PAIEMENT ROW
+  // ══════════════════════════════════════════════════════════════════════════
+  fillRect(doc, 0, 42, PW, 11, N.slate100)
+  txt(doc, `Date d'émission : ${formatDate(invoice.date)}`,        M,        48, { size: 8, color: N.slate700 })
+  txt(doc, `Échéance : ${invoice.echeanceLabel || '30 jours'}`,   PW / 2,   48, { size: 8, color: N.slate700, align: 'center' })
+  txt(doc, `Paiement : ${invoice.paiement}`,                      PW - M,   48, { size: 8, color: N.slate700, align: 'right' })
 
-  // ── 3. Addresses ────────────────────────────────────────────────────────────
-  let y = 58
+  // ══════════════════════════════════════════════════════════════════════════
+  // 3. ADDRESSES  (DE / À)
+  // ══════════════════════════════════════════════════════════════════════════
+  let y = 62
 
-  // Emetteur (left)
-  text(doc, 'DE', M, y, { size: 7, color: C.slate500, bold: true })
-  doc.setDrawColor(...C.blue)
+  // — Emetteur (left) ———————————————————————————————————————————————————————
+  txt(doc, 'DE', M, y, { size: 7, color: N.slate500, bold: true })
+  doc.setDrawColor(...ACCENT)
   doc.setLineWidth(0.5)
-  doc.line(M + 8, y - 1, M + 22, y - 1)
+  doc.line(M + 8, y - 0.5, M + 24, y - 0.5)
   y += 5
-  text(doc, profil.nom || 'THE NEXT STEP', M, y, { size: 9, color: C.slate900, bold: true })
-  y += 5
+
+  txt(doc, profil.nom || '', M, y, { size: 9.5, color: N.slate900, bold: true })
+  y += 5.5
+
   if (profil.adresse) {
-    const addrLines = profil.adresse.split(/[,\n]/).map(s => s.trim()).filter(Boolean)
-    addrLines.forEach(line => {
-      text(doc, line, M, y, { size: 8, color: C.slate700 })
-      y += 4.5
-    })
+    const lines = profil.adresse.split(/[,\n]/).map(s => s.trim()).filter(Boolean)
+    for (const l of lines) { txt(doc, l, M, y, { size: 8, color: N.slate700 }); y += 4.5 }
   }
-  if (profil.email) { text(doc, profil.email, M, y, { size: 8, color: C.slate700 }); y += 4.5 }
-  if (profil.tel)   { text(doc, profil.tel,   M, y, { size: 8, color: C.slate700 }); y += 4.5 }
+  if (profil.email) { txt(doc, profil.email, M, y, { size: 8, color: N.slate700 }); y += 4.5 }
+  if (profil.tel)   { txt(doc, profil.tel,   M, y, { size: 8, color: N.slate700 }); y += 4.5 }
+  if (profil.siret) { txt(doc, `SIRET : ${profil.siret}`, M, y, { size: 8, color: N.slate500 }) }
 
-  // Destinataire (right)
-  let yr = 58
+  // — Destinataire (right) ——————————————————————————————————————————————————
+  let yr = 62
   const rx = PW / 2 + 5
-  text(doc, 'À', rx, yr, { size: 7, color: C.slate500, bold: true })
-  yr += 5
-  rect(doc, rx, yr - 4, PW - rx - M, 0.3, C.blue)
 
-  text(doc, invoice.clientNom, rx, yr, { size: 9, color: C.slate900, bold: true })
+  txt(doc, 'FACTURÉ À', rx, yr, { size: 7, color: N.slate500, bold: true })
+  doc.setDrawColor(...ACCENT)
+  doc.setLineWidth(0.5)
+  doc.line(rx, yr + 1, PW - M, yr + 1)
   yr += 5
-  if (invoice.clientSiret) {
-    text(doc, `SIRET ${invoice.clientSiret}`, rx, yr, { size: 8, color: C.slate500 })
-    yr += 4.5
-  }
+
+  txt(doc, invoice.clientNom, rx, yr, { size: 9.5, color: N.slate900, bold: true })
+  yr += 5.5
+
   if (invoice.clientAdresse) {
     const lines = invoice.clientAdresse.split(/[,\n]/).map(s => s.trim()).filter(Boolean)
-    lines.forEach(line => {
-      text(doc, line, rx, yr, { size: 8, color: C.slate700 })
-      yr += 4.5
-    })
+    for (const l of lines) { txt(doc, l, rx, yr, { size: 8, color: N.slate700 }); yr += 4.5 }
   }
-  if (invoice.clientEmail) { text(doc, invoice.clientEmail, rx, yr, { size: 8, color: C.slate700 }) }
+  if (invoice.clientSiret) { txt(doc, `SIRET : ${invoice.clientSiret}`, rx, yr, { size: 8, color: N.slate500 }); yr += 4.5 }
+  if (invoice.clientEmail) { txt(doc, invoice.clientEmail, rx, yr, { size: 8, color: N.slate700 }) }
 
-  // ── 4. Line items table ──────────────────────────────────────────────────────
-  y = Math.max(y, yr) + 10
+  // ══════════════════════════════════════════════════════════════════════════
+  // 4. LINE ITEMS TABLE
+  // ══════════════════════════════════════════════════════════════════════════
+  y = Math.max(y, yr) + 12
+
+  const COL = { desc: M, qte: 122, pu: 150, tot: PW - M - 2 }
 
   // Table header
-  const COL = { desc: M, qte: 120, pu: 148, total: 175 }
-  rect(doc, M, y, PW - 2 * M, 8, C.navy)
-  text(doc, 'DESCRIPTION',    COL.desc  + 2, y + 5.2, { size: 7.5, color: C.white, bold: true })
-  text(doc, 'QTÉ',            COL.qte,        y + 5.2, { size: 7.5, color: C.white, bold: true, align: 'center' })
-  text(doc, 'PRIX UNIT. HT',  COL.pu,         y + 5.2, { size: 7.5, color: C.white, bold: true, align: 'right' })
-  text(doc, 'TOTAL HT',       PW - M - 2,     y + 5.2, { size: 7.5, color: C.white, bold: true, align: 'right' })
+  fillRect(doc, M, y, PW - 2 * M, 8, PRIMARY)
+  txt(doc, 'PRESTATION',     COL.desc + 3, y + 5.2, { size: 7.5, color: N.white, bold: true })
+  txt(doc, 'QTÉ',            COL.qte,      y + 5.2, { size: 7.5, color: N.white, bold: true, align: 'center' })
+  txt(doc, 'P.U. HT',        COL.pu,       y + 5.2, { size: 7.5, color: N.white, bold: true, align: 'right' })
+  txt(doc, 'TOTAL HT',       COL.tot,      y + 5.2, { size: 7.5, color: N.white, bold: true, align: 'right' })
   y += 8
 
-  // Rows
-  invoice.lignes.forEach((ligne, i) => {
-    const bg = i % 2 === 0 ? C.white : C.slate100
-    const rowH = 8
-    rect(doc, M, y, PW - 2 * M, rowH, bg)
+  // Line rows
+  const lignes = Array.isArray(invoice.lignes) ? invoice.lignes : []
+  if (lignes.length === 0) {
+    // Graceful fallback if no lines
+    fillRect(doc, M, y, PW - 2 * M, 8, N.white)
+    txt(doc, '(aucune prestation)', COL.desc + 3, y + 5.2, { size: 8, color: N.slate500 })
+    y += 8
+  } else {
+    for (let i = 0; i < lignes.length; i++) {
+      const ligne  = lignes[i]
+      const rowH   = 9
+      const bg     = i % 2 === 0 ? N.white : N.slate100
+      fillRect(doc, M, y, PW - 2 * M, rowH, bg)
+      hline(doc, M, y + rowH, PW - M, N.slate300, 0.2)
 
-    // Border bottom
-    doc.setDrawColor(...C.slate300)
-    doc.setLineWidth(0.2)
-    doc.line(M, y + rowH, PW - M, y + rowH)
+      const lineTotal = (ligne.qte ?? 0) * (ligne.pu ?? 0)
+      txt(doc, ligne.desc ?? '',           COL.desc + 3, y + 5.8, { size: 8.5, color: N.slate900 })
+      txt(doc, String(ligne.qte ?? 1),     COL.qte,      y + 5.8, { size: 8.5, color: N.slate700, align: 'center' })
+      txt(doc, formatEur(ligne.pu ?? 0),   COL.pu,       y + 5.8, { size: 8.5, color: N.slate700, align: 'right' })
+      txt(doc, formatEur(lineTotal),        COL.tot,      y + 5.8, { size: 8.5, color: N.slate900, bold: true, align: 'right' })
+      y += rowH
+    }
+  }
 
-    const lineTotal = ligne.qte * ligne.pu
-
-    text(doc, ligne.desc,                          COL.desc + 2, y + 5.2, { size: 8.5, color: C.slate900 })
-    text(doc, String(ligne.qte),                   COL.qte,       y + 5.2, { size: 8.5, color: C.slate700, align: 'center' })
-    text(doc, formatEur(ligne.pu),                 COL.pu,        y + 5.2, { size: 8.5, color: C.slate700, align: 'right' })
-    text(doc, formatEur(lineTotal),                PW - M - 2,    y + 5.2, { size: 8.5, color: C.slate900, bold: true, align: 'right' })
-
-    y += rowH
-  })
-
-  // ── 5. Totals block ──────────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════════
+  // 5. TOTALS BLOCK
+  // ══════════════════════════════════════════════════════════════════════════
   y += 6
-  const totalBoxX = PW / 2 + 5
-  const totalBoxW = PW - M - totalBoxX
+  const tbX = PW / 2 + 5
+  const tbW = PW - M - tbX
 
-  // Subtotal row
-  rect(doc, totalBoxX, y, totalBoxW, 7, C.slate100)
-  text(doc, 'Sous-total HT',   totalBoxX + 4,   y + 4.8, { size: 8, color: C.slate700 })
-  text(doc, formatEur(invoice.total), PW - M - 3, y + 4.8, { size: 8, color: C.slate900, bold: true, align: 'right' })
+  fillRect(doc, tbX, y, tbW, 7, N.slate100)
+  txt(doc, 'Sous-total HT',           tbX + 4,   y + 4.8, { size: 8, color: N.slate700 })
+  txt(doc, formatEur(invoice.total),  PW - M - 3, y + 4.8, { size: 8, color: N.slate900, bold: true, align: 'right' })
   y += 7
 
-  // TVA
-  rect(doc, totalBoxX, y, totalBoxW, 7, C.white)
-  doc.setDrawColor(...C.slate300)
-  doc.setLineWidth(0.2)
-  doc.line(totalBoxX, y, totalBoxX + totalBoxW, y)
-  text(doc, 'TVA (0%)',         totalBoxX + 4, y + 4.8, { size: 8, color: C.slate500 })
-  text(doc, '—',                PW - M - 3,   y + 4.8, { size: 8, color: C.slate500, align: 'right' })
+  fillRect(doc, tbX, y, tbW, 7, N.white)
+  hline(doc, tbX, y, tbX + tbW, N.slate300, 0.2)
+  txt(doc, 'TVA',                              tbX + 4,   y + 4.8, { size: 8, color: N.slate500 })
+  txt(doc, 'Non applicable — art. 293 B CGI', PW - M - 3, y + 4.8, { size: 7.5, color: N.slate500, align: 'right' })
   y += 7
 
-  // Total TTC
-  rect(doc, totalBoxX, y, totalBoxW, 10, C.navy)
-  text(doc, 'TOTAL TTC',        totalBoxX + 4, y + 6.5, { size: 9, color: C.white, bold: true })
-  text(doc, formatEur(invoice.total), PW - M - 3, y + 6.5, { size: 10, color: C.white, bold: true, align: 'right' })
+  fillRect(doc, tbX, y, tbW, 10, PRIMARY)
+  txt(doc, 'Total à payer',           tbX + 4,    y + 6.8, { size: 9, color: N.white, bold: true })
+  txt(doc, formatEur(invoice.total),  PW - M - 3, y + 6.8, { size: 10, color: N.white, bold: true, align: 'right' })
   y += 10
 
-  // ── 6. Payment info ──────────────────────────────────────────────────────────
-  if (profil.iban || invoice.iban) {
-    y += 8
-    rect(doc, M, y, PW - 2 * M, 0.4, C.slate300)
+  // ══════════════════════════════════════════════════════════════════════════
+  // 6. BANK DETAILS
+  // ══════════════════════════════════════════════════════════════════════════
+  const hasBank = !!(profil.iban || invoice.iban || d.bic || d.bankName)
+  if (hasBank) {
+    y += 10
+    hline(doc, M, y, PW - M, N.slate300)
     y += 5
-    text(doc, 'INFORMATIONS DE PAIEMENT', M, y, { size: 7, color: C.slate500, bold: true })
-    y += 4.5
-    text(doc, `Mode : ${invoice.paiement}`, M, y, { size: 8, color: C.slate700 })
-    if (profil.iban || invoice.iban) {
-      y += 4.5
-      text(doc, `IBAN : ${profil.iban || invoice.iban}`, M, y, { size: 8, color: C.slate700, bold: true })
-    }
-    y += 4.5
-    text(doc, `Bénéficiaire : ${profil.nom}`, M, y, { size: 8, color: C.slate700 })
+
+    txt(doc, 'BANK DETAILS', M, y, { size: 8, color: N.slate900, bold: true })
+    y += 5.5
+
+    const iban  = profil.iban || invoice.iban || ''
+    const titul = d.titulaire || profil.nom || ''
+
+    if (d.bankName)   { txt(doc, d.bankName,          M, y, { size: 8, color: N.slate700 }); y += 4.5 }
+    if (titul)        { txt(doc, `Titulaire du compte : ${titul}`, M, y, { size: 8, color: N.slate700 }); y += 4.5 }
+
+    // BIC + IBAN on same line
+    const bicIban = [d.bic ? `BIC : ${d.bic}` : '', iban ? `IBAN : ${iban}` : ''].filter(Boolean).join('   |   ')
+    if (bicIban) { txt(doc, bicIban, M, y, { size: 8, color: N.slate900, bold: true }); y += 4.5 }
+
+    if (d.bankDetails) { txt(doc, d.bankDetails, M, y, { size: 7.5, color: N.slate700 }); y += 4.5 }
+
+    txt(doc, `Paiement : ${invoice.paiement}`, M, y, { size: 8, color: N.slate700 })
   }
 
   // Notes
   if (invoice.notes) {
-    y += 8
-    text(doc, 'NOTES', M, y, { size: 7, color: C.slate500, bold: true })
+    y += hasBank ? 8 : 10
+    hline(doc, M, y, PW - M, N.slate300)
+    y += 5
+    txt(doc, 'NOTES', M, y, { size: 7.5, color: N.slate500, bold: true })
     y += 4.5
-    const noteLines = doc.splitTextToSize(invoice.notes, PW - 2 * M - 10)
-    noteLines.forEach((line: string) => {
-      text(doc, line, M, y, { size: 8, color: C.slate700 })
-      y += 4.5
-    })
+    const noteLines = doc.splitTextToSize(invoice.notes, PW - 2 * M - 10) as string[]
+    for (const l of noteLines) { txt(doc, l, M, y, { size: 8, color: N.slate700 }); y += 4.5 }
   }
 
-  // ── 7. Footer ────────────────────────────────────────────────────────────────
-  const FOOTER_Y = 285
-  rect(doc, 0, FOOTER_Y, PW, 12, C.slate100)
-  text(doc,
+  // ══════════════════════════════════════════════════════════════════════════
+  // 7. FOOTER
+  // ══════════════════════════════════════════════════════════════════════════
+  const FY = 285
+  fillRect(doc, 0, FY, PW, 12, N.slate100)
+  hline(doc, 0, FY, PW, N.slate300)
+  txt(doc,
     'TVA non applicable, article 293B du CGI',
-    PW / 2, FOOTER_Y + 4.5,
-    { size: 7, color: C.slate500, align: 'center' }
+    PW / 2, FY + 4.5,
+    { size: 7, color: N.slate500, align: 'center' }
   )
-  text(doc,
-    `${profil.nom}${profil.siret ? ` • SIRET ${profil.siret}` : ''}${profil.adresse ? ` • ${profil.adresse}` : ''}`,
-    PW / 2, FOOTER_Y + 8.5,
-    { size: 6.5, color: C.slate500, align: 'center' }
-  )
+  const footerParts = [profil.nom, profil.siret ? `SIRET ${profil.siret}` : '', profil.adresse].filter(Boolean)
+  txt(doc, footerParts.join(' • '), PW / 2, FY + 8.5, { size: 6.5, color: N.slate500, align: 'center' })
 
-  // ── 8. Return base64 ─────────────────────────────────────────────────────────
   return doc.output('datauristring')
 }
 
+// ─── Download helper ──────────────────────────────────────────────────────────
 export async function downloadInvoicePdf(invoice: Invoice, profil: Profil): Promise<void> {
-  const JsPDF = await getJsPDF()
-  const doc = new JsPDF({ unit: 'mm', format: 'a4' })
-
-  // Re-generate into doc for download (same logic, but use save)
-  const dataUri = await generateInvoicePdf(invoice, profil)
+  const uri  = await generateInvoicePdf(invoice, profil)
   const link = document.createElement('a')
-  link.href = dataUri
+  link.href     = uri
   link.download = `${invoice.num}.pdf`
   link.click()
 }
 
-// ─── Returns base64 string (no data URI prefix) ───────────────────────────────
+// ─── Base64 string (no data URI prefix) ──────────────────────────────────────
 export async function generatePdfBase64(invoice: Invoice, profil: Profil): Promise<string> {
-  const JsPDF = await getJsPDF()
-  const doc = new JsPDF({ unit: 'mm', format: 'a4' })
-
-  const dataUri = await generateInvoicePdf(invoice, profil)
-  // Strip "data:application/pdf;filename=generated.pdf;base64,"
-  return dataUri.split('base64,')[1] ?? ''
+  const uri = await generateInvoicePdf(invoice, profil)
+  return uri.split('base64,')[1] ?? ''
 }

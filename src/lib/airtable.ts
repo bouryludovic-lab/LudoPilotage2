@@ -220,6 +220,10 @@ export async function updateProfilInAirtable(atId: string, profil: Partial<Profi
   if (profil.tel     !== undefined) fields[F.profils.tel]     = profil.tel
   if (profil.iban    !== undefined) fields[F.profils.iban]    = profil.iban
   if (profil.prefix  !== undefined) fields[F.profils.prefix]  = profil.prefix
+  // design is stored as a JSON string in the 'design' field
+  if (profil.design  !== undefined) fields['design'] = typeof profil.design === 'string'
+    ? profil.design
+    : JSON.stringify(profil.design)
   return update(AT_TABLES.profils, atId, fields)
 }
 

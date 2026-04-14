@@ -44,6 +44,33 @@ export interface Client {
   userEmail?: string
 }
 
+export interface InvoiceDesign {
+  /** Header background color, hex e.g. "#1a2744" */
+  primaryColor: string
+  /** Badge / accent color, hex e.g. "#2563eb" */
+  accentColor:  string
+  /** Tagline shown under company name */
+  tagline:      string
+  /** Bank institution name */
+  bankName:     string
+  /** BIC / SWIFT code */
+  bic:          string
+  /** Account holder (if different from nom) */
+  titulaire:    string
+  /** Extra RIB info: "Banque: X | Guichet: Y | Compte: Z | Clé RIB: W" */
+  bankDetails:  string
+}
+
+export const DEFAULT_DESIGN: InvoiceDesign = {
+  primaryColor: '#1a2744',
+  accentColor:  '#2563eb',
+  tagline:      'CONSULTING & STRATEGY',
+  bankName:     '',
+  bic:          '',
+  titulaire:    '',
+  bankDetails:  '',
+}
+
 export interface Profil {
   atId?: string
   nom: string
@@ -58,6 +85,8 @@ export interface Profil {
   webhook?: string
   ghToken?: string
   claudeKey?: string
+  /** Invoice visual design & bank details */
+  design?: InvoiceDesign
 }
 
 export interface Config {
