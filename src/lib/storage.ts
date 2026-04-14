@@ -1,6 +1,6 @@
 import type { Client, Config, Invoice, InvoiceTemplate, Profil } from './types'
 
-// ─── Safe localStorage wrapper ───────────────────────────────────────────────
+// ─── Safe localStorage / sessionStorage wrappers ─────────────────────────────
 
 function get<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback
@@ -30,28 +30,69 @@ function remove(key: string): void {
 
 export const storage = {
   // ── Auth ──────────────────────────────────────────────────────────────────
-  getToken: (): string => localStorage.getItem('at_token') ?? '',
-  setToken: (token: string) => localStorage.setItem('at_token', token),
-  clearToken: () => remove('at_token'),
 
-  getBootstrapToken: (): string => localStorage.getItem('at_bootstrap') ?? '',
-  setBootstrapToken: (token: string) => localStorage.setItem('at_bootstrap', token),
+  /**
+   * Save the auth token.
+   * persist=true  → localStorage  (survives browser close — "rester connecté")
+   * persist=false → sessionStorage (cleared when browser/tab closes)
+   */
+  setToken: (token: string, persist = true): void => {
+    if (typeof window === 'undefined') return
+    if (persist) {
+      localStorage.setItem('at_token', token)
+      sessionStorage.removeItem('at_token')
+    } else {
+      sessionStorage.setItem('at_token', token)
+      localStorage.removeItem('at_token')
+    }
+    // Remember user's preference for next time
+    localStorage.setItem('at_stay', persist ? '1' : '0')
+  },
+
+  getToken: (): string => {
+    if (typeof window === 'undefined') return ''
+    return localStorage.getItem('at_token') ?? sessionStorage.getItem('at_token') ?? ''
+  },
+
+  /** Whether the user previously chose "stay logged in" */
+  getStayLoggedIn: (): boolean => {
+    if (typeof window === 'undefined') return true
+    return localStorage.getItem('at_stay') !== '0'
+  },
+
+  clearToken: (): void => {
+    if (typeof window === 'undefined') return
+    localStorage.removeItem('at_token')
+    sessionStorage.removeItem('at_token')
+  },
 
   isLoggedIn: (): boolean => {
     if (typeof window === 'undefined') return false
-    return !!localStorage.getItem('at_token')
+    return !!(localStorage.getItem('at_token') || sessionStorage.getItem('at_token'))
   },
 
-  logout: () => {
-    remove('at_token')
+  logout: (): void => {
+    if (typeof window === 'undefined') return
+    localStorage.removeItem('at_token')
+    sessionStorage.removeItem('at_token')
+    // Keep 'at_stay' preference so checkbox remembers user choice
+  },
+
+  getBootstrapToken: (): string => {
+    if (typeof window === 'undefined') return ''
+    return localStorage.getItem('at_bootstrap') ?? ''
+  },
+  setBootstrapToken: (token: string): void => {
+    if (typeof window === 'undefined') return
+    localStorage.setItem('at_bootstrap', token)
   },
 
   // ── Data ──────────────────────────────────────────────────────────────────
-  getFactures:  (): Invoice[] => get<Invoice[]>('factures', []),
-  setFactures:  (v: Invoice[]) => set('factures', v),
+  getFactures:  (): Invoice[]       => get<Invoice[]>('factures', []),
+  setFactures:  (v: Invoice[])      => set('factures', v),
 
-  getClients:   (): Client[]  => get<Client[]>('clients', []),
-  setClients:   (v: Client[])  => set('clients', v),
+  getClients:   (): Client[]        => get<Client[]>('clients', []),
+  setClients:   (v: Client[])       => set('clients', v),
 
   getProfil: (): Profil => get<Profil>('profil', {
     nom: '', siret: '', adresse: '', email: '', tel: '', iban: '', prefix: 'F-',
