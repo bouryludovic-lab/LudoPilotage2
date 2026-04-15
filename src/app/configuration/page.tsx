@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { CheckCircle, XCircle, Eye, EyeOff, Settings, Shield, Mail } from 'lucide-react'
@@ -11,6 +11,14 @@ import { useAppStore } from '@/store'
 import { storage } from '@/lib/storage'
 
 export default function ConfigurationPage() {
+  return (
+    <Suspense>
+      <ConfigurationContent />
+    </Suspense>
+  )
+}
+
+function ConfigurationContent() {
   const { config, setConfig, profil, setProfil } = useAppStore()
   const searchParams = useSearchParams()
   const router       = useRouter()
