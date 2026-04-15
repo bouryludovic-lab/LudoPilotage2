@@ -1,4 +1,4 @@
-import type { Client, Config, Invoice, InvoiceTemplate, Profil } from './types'
+import type { Client, Config, CoachingConfig, Invoice, InvoiceTemplate, Profil } from './types'
 
 // ─── Safe localStorage / sessionStorage wrappers ─────────────────────────────
 
@@ -109,4 +109,11 @@ export const storage = {
     lignes:      [{ desc: '', qte: 1, pu: 0 }],
   }),
   setTemplate: (v: InvoiceTemplate) => set('invoice_template', v),
+
+  getCoachingConfig: (): CoachingConfig => get<CoachingConfig>('coaching_config', {
+    offre: '',
+    promesse: '',
+    programContent: '',
+  }),
+  setCoachingConfig: (v: CoachingConfig) => set('coaching_config', v),
 }

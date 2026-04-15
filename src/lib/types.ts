@@ -162,6 +162,31 @@ export interface ChatMessage {
   timestamp: string
 }
 
+// ─── Coaching (student Q&A management) ───────────────────────────────────────
+
+export interface CoachingSubmission {
+  id: string
+  atId?: string
+  studentName: string
+  studentEmail: string
+  question: string
+  questionType: 'offre' | 'promesse' | 'general'
+  pdfUrls: string[]
+  date: string
+  status: 'new' | 'draft' | 'sent'
+  aiResponse: string
+  userEmail?: string
+}
+
+export interface CoachingConfig {
+  /** What the coach sells — format, modules, price, duration */
+  offre: string
+  /** The transformation/outcome promised to students */
+  promesse: string
+  /** Pasted text from the program PDF or detailed description */
+  programContent: string
+}
+
 // ─── Invoice template (defaults for new invoices, stored in localStorage) ────
 
 export interface InvoiceTemplate {
