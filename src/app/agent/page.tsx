@@ -1,20 +1,60 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
-import { Bot, Send, Plus, Sparkles, Zap, ChevronRight, Trash2 } from 'lucide-react'
+import { Bot, Send, Plus, Sparkles, Zap, ChevronRight, Trash2, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Input, Textarea } from '@/components/ui/Input'
-import type { AIAgent, ChatMessage } from '@/lib/types'
+import { useAppStore } from '@/store'
+import { storage } from '@/lib/storage'
+import { generateInvoiceNum, addDays, ECHEANCE_OPTIONS, formatEur, uid } from '@/lib/utils'
+import { AT_TABLES, AT_FIELDS } from '@/lib/types'
+import type { AIAgent, ChatMessage, Invoice } from '@/lib/types'
 import { toast } from 'sonner'
+
+// ── Claude tool: create_invoice ───────────────────────────────────────────────
+
+const INVOICE_TOOL = {
+  name: 'create_invoice',
+  description: "Crée une facture réelle dans le système LudoPilotage et l'enregistre en base de données. Utilise cet outil dès que l'utilisateur demande de créer une facture.",
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      clientNom:     { type: 'string', description: 'Nom du client ou de l\'entreprise cliente' },
+      clientEmail:   { type: 'string', description: 'Email du client (optionnel)' },
+      clientAdresse: { type: 'string', description: 'Adresse du client (optionnel)' },
+      lignes: {
+        type: 'array',
+        description: 'Lignes de prestation de la facture',
+        items: {
+          type: 'object',
+          properties: {
+            desc: { type: 'string', description: 'Description de la prestation' },
+            qte:  { type: 'number', description: 'Quantité' },
+            pu:   { type: 'number', description: 'Prix unitaire HT en euros' },
+          },
+          required: ['desc', 'qte', 'pu'],
+        },
+      },
+      echeanceDays: { type: 'number', description: 'Délai de paiement en jours : 0, 15, 30, 45 ou 60. Défaut : 30' },
+      paiement:     { type: 'string', description: 'Mode de paiement. Défaut : Virement bancaire' },
+      notes:        { type: 'string', description: 'Notes ou commentaires (optionnel)' },
+      date:         { type: 'string', description: 'Date de la facture YYYY-MM-DD (optionnel, défaut : aujourd\'hui)' },
+    },
+    required: ['clientNom', 'lignes'],
+  },
+}
+
+// ── Default agents ────────────────────────────────────────────────────────────
 
 const DEFAULT_AGENTS: AIAgent[] = [
   {
     id: '1',
     name: 'Assistant Facturation',
-    description: 'Aide à rédiger des emails de relance et gérer les factures',
-    systemPrompt: 'Tu es un assistant expert en facturation et gestion financière pour entrepreneurs. Tu aides à rédiger des emails professionnels de relance, analyser des situations de paiement, et optimiser le suivi client.',
+    description: 'Crée des factures réelles par simple description en langage naturel',
+    systemPrompt: '', // built dynamically per request
     model: 'claude-sonnet-4-6',
     active: true,
     createdAt: '2026-01-01',
@@ -32,68 +72,245 @@ const DEFAULT_AGENTS: AIAgent[] = [
   },
 ]
 
+type ApiMessage = {
+  role: 'user' | 'assistant'
+  content: string | unknown[]
+}
+
 export default function AgentPage() {
-  const [agents, setAgents]         = useState<AIAgent[]>(DEFAULT_AGENTS)
-  const [selected, setSelected]     = useState<AIAgent | null>(null)
-  const [messages, setMessages]     = useState<ChatMessage[]>([])
-  const [input, setInput]           = useState('')
-  const [sending, setSending]       = useState(false)
-  const [showCreate, setShowCreate] = useState(false)
-  const [newAgent, setNewAgent]     = useState({ name: '', description: '', systemPrompt: '' })
+  const { factures, clients, profil, addFacture } = useAppStore()
+
+  const [agents, setAgents]           = useState<AIAgent[]>(DEFAULT_AGENTS)
+  const [selected, setSelected]       = useState<AIAgent | null>(null)
+  const [messages, setMessages]       = useState<ChatMessage[]>([])
+  const [input, setInput]             = useState('')
+  const [sending, setSending]         = useState(false)
+  const [showCreate, setShowCreate]   = useState(false)
+  const [newAgent, setNewAgent]       = useState({ name: '', description: '', systemPrompt: '' })
+  const [lastCreatedNum, setLastCreatedNum] = useState<string | null>(null)
+
   const bottomRef = useRef<HTMLDivElement>(null)
+  const apiMsgs   = useRef<ApiMessage[]>([])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // ── System prompt (facturation agent gets dynamic client list) ────────────
+
+  function buildSystemPrompt(agent: AIAgent): string {
+    if (agent.id !== '1') return agent.systemPrompt
+
+    const clientList = clients.length > 0
+      ? clients.map(c => `- ${c.nom}${c.email ? ` (${c.email})` : ''}`).join('\n')
+      : 'Aucun client enregistré pour l\'instant.'
+
+    return `Tu es l'Assistant Facturation de LudoPilotage. Tu crées des factures réelles directement dans le système grâce à l'outil create_invoice.
+
+COMPORTEMENT :
+- Quand l'utilisateur demande de créer une facture, collecte : nom client, prestations (description + quantité + prix unitaire HT)
+- Si les infos essentielles sont là, appelle directement create_invoice sans attendre
+- Sinon, pose 1-2 questions courtes pour compléter
+- Après création, confirme avec le numéro de facture et le montant total HT
+- Reformule les montants en euros français (ex : 1 200,00 €)
+
+CLIENTS DANS LE SYSTÈME :
+${clientList}
+
+PROFIL ENTREPRISE :
+Nom : ${profil.nom || 'Non configuré'}
+SIRET : ${profil.siret || 'N/A'}
+Préfixe factures : ${profil.prefix || 'F-'}
+IBAN : ${profil.iban || 'Non configuré'}
+
+Tu peux aussi aider à rédiger des emails de relance et conseiller sur la gestion financière.`
+  }
+
+  // ── Select agent ──────────────────────────────────────────────────────────
+
   function selectAgent(agent: AIAgent) {
     setSelected(agent)
-    setMessages([
-      {
-        role: 'assistant',
-        content: `Bonjour ! Je suis **${agent.name}**. ${agent.description}. Comment puis-je t'aider ?`,
-        timestamp: new Date().toISOString(),
-      }
-    ])
+    apiMsgs.current = []
+    setLastCreatedNum(null)
+    setMessages([{
+      role: 'assistant',
+      content: agent.id === '1'
+        ? `Bonjour ! Je suis votre **Assistant Facturation**.\n\nJe peux créer des factures directement dans votre système. Dites-moi par exemple :\n• "Facture pour Jean Dupont, 2 jours de conseil à 800€"\n• "Crée une facture pour Acme Corp, développement web 3 500€"\n\nQue souhaitez-vous faire ?`
+        : `Bonjour ! Je suis **${agent.name}**. ${agent.description}. Comment puis-je vous aider ?`,
+      timestamp: new Date().toISOString(),
+    }])
     setInput('')
   }
 
-  async function sendMessage() {
-    if (!input.trim() || !selected || sending) return
-    const userMsg: ChatMessage = { role: 'user', content: input.trim(), timestamp: new Date().toISOString() }
-    setMessages(prev => [...prev, userMsg])
-    setInput('')
-    setSending(true)
+  // ── Execute create_invoice tool ───────────────────────────────────────────
 
+  async function executeCreateInvoice(toolInput: Record<string, unknown>): Promise<Invoice | null> {
+    const userEmail    = storage.getToken()
+    const today        = new Date().toISOString().split('T')[0]
+    const date         = (toolInput.date as string) || today
+    const echeanceDays = (toolInput.echeanceDays as number) ?? 30
+    const echeance     = addDays(date, echeanceDays)
+    const echeanceLabel = ECHEANCE_OPTIONS.find(o => o.days === echeanceDays)?.label ?? `${echeanceDays} jours`
+    const clientNom    = toolInput.clientNom as string
+    const lignes       = toolInput.lignes as Array<{ desc: string; qte: number; pu: number }>
+    const matched      = clients.find(c => c.nom.toLowerCase().includes(clientNom.toLowerCase()))
+
+    const invoice: Invoice = {
+      id:            uid(),
+      num:           generateInvoiceNum(profil.prefix || 'F-', factures.map(f => f.num)),
+      date,
+      echeance,
+      echeanceLabel,
+      clientId:      matched?.id || '',
+      clientNom,
+      clientEmail:   (toolInput.clientEmail as string) || matched?.email || '',
+      clientAdresse: (toolInput.clientAdresse as string) || matched?.adresse || '',
+      clientSiret:   matched?.siret || '',
+      paiement:      (toolInput.paiement as string) || 'Virement bancaire',
+      iban:          profil.iban || '',
+      notes:         (toolInput.notes as string) || '',
+      lignes,
+      total:         lignes.reduce((s, l) => s + l.qte * l.pu, 0),
+      statut:        'pending',
+      userEmail,
+    }
+
+    // Save to Airtable via server proxy
     try {
-      // Use server-side proxy — ANTHROPIC_API_KEY stays in Vercel env
-      const resp = await fetch('/api/claude', {
-        method: 'POST',
+      const F   = AT_FIELDS
+      const res = await fetch('/api/airtable', {
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: selected.model,
-          maxTokens: 1024,
-          systemPrompt: selected.systemPrompt,
-          messages: [...messages, userMsg]
-            .filter(m => m.role === 'user' || m.role === 'assistant')
-            .map(m => ({ role: m.role, content: m.content })),
+          table:  AT_TABLES.factures,
+          method: 'POST',
+          fields: {
+            [F.factures.num]:          invoice.num,
+            [F.factures.client_nom]:   invoice.clientNom,
+            [F.factures.client_email]: invoice.clientEmail,
+            [F.factures.montant]:      invoice.total,
+            [F.factures.date]:         invoice.date,
+            [F.factures.echeance]:     invoice.echeance,
+            [F.factures.statut]:       invoice.statut,
+            [F.factures.prestation]:   JSON.stringify(invoice.lignes),
+            [F.factures.paiement]:     invoice.paiement,
+            [F.factures.notes]:        invoice.notes,
+            [F.factures.user_email]:   userEmail,
+          },
         }),
       })
-      const data = await resp.json()
-      if (!resp.ok) {
-        const errMsg = data.error ?? 'Erreur IA'
-        const isUnconfigured = errMsg.includes('ANTHROPIC_API_KEY')
+      if (res.ok) {
+        const d = await res.json()
+        invoice.atId = d.records?.[0]?.id
+      }
+    } catch {
+      // Continue — invoice saved locally even if Airtable fails
+    }
+
+    addFacture(invoice)
+    return invoice
+  }
+
+  // ── Send message ──────────────────────────────────────────────────────────
+
+  async function sendMessage() {
+    if (!input.trim() || !selected || sending) return
+
+    const text    = input.trim()
+    const userMsg: ChatMessage = { role: 'user', content: text, timestamp: new Date().toISOString() }
+
+    setMessages(prev => [...prev, userMsg])
+    apiMsgs.current.push({ role: 'user', content: text })
+    setInput('')
+    setSending(true)
+    setLastCreatedNum(null)
+
+    const isFacturation = selected.id === '1'
+    const systemPrompt  = buildSystemPrompt(selected)
+
+    try {
+      // ── First API call ───────────────────────────────────────────────────
+      const r1  = await fetch('/api/claude', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model:       selected.model,
+          maxTokens:   1500,
+          systemPrompt,
+          messages:    apiMsgs.current,
+          tools:       isFacturation ? [INVOICE_TOOL] : undefined,
+        }),
+      })
+      const d1 = await r1.json()
+
+      if (!r1.ok) {
+        const errMsg = d1.error ?? 'Erreur IA'
         setMessages(prev => [...prev, {
           role: 'assistant',
-          content: isUnconfigured
+          content: errMsg.includes('ANTHROPIC_API_KEY')
             ? "La clé API Claude n'est pas configurée. Ajoute `ANTHROPIC_API_KEY` dans les variables d'environnement Vercel."
-            : `Erreur: ${errMsg}`,
+            : `Erreur : ${errMsg}`,
           timestamp: new Date().toISOString(),
         }])
-        setSending(false)
         return
       }
-      setMessages(prev => [...prev, { role: 'assistant', content: data.text, timestamp: new Date().toISOString() }])
+
+      // ── Tool use: create_invoice ─────────────────────────────────────────
+      if (d1.stopReason === 'tool_use' && d1.toolUse?.name === 'create_invoice') {
+        // Record assistant tool_use in API history
+        apiMsgs.current.push({
+          role: 'assistant',
+          content: [{
+            type:  'tool_use',
+            id:    d1.toolUse.id,
+            name:  d1.toolUse.name,
+            input: d1.toolUse.input,
+          }],
+        })
+
+        // Execute the tool
+        const invoice = await executeCreateInvoice(d1.toolUse.input)
+
+        const resultContent = invoice
+          ? `Facture créée. Numéro : ${invoice.num}. Montant HT : ${formatEur(invoice.total)}. Client : ${invoice.clientNom}.`
+          : 'Erreur lors de la création de la facture.'
+
+        // Record tool result in API history
+        apiMsgs.current.push({
+          role: 'user',
+          content: [{
+            type:        'tool_result',
+            tool_use_id: d1.toolUse.id,
+            content:     resultContent,
+          }],
+        })
+
+        // ── Second API call: final confirmation ──────────────────────────
+        const r2  = await fetch('/api/claude', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model:       selected.model,
+            maxTokens:   1024,
+            systemPrompt,
+            messages:    apiMsgs.current,
+            tools:       [INVOICE_TOOL],
+          }),
+        })
+        const d2        = await r2.json()
+        const finalText = d2.text || (invoice ? `Facture **${invoice.num}** créée avec succès !` : 'Une erreur est survenue.')
+
+        apiMsgs.current.push({ role: 'assistant', content: finalText })
+        setMessages(prev => [...prev, { role: 'assistant', content: finalText, timestamp: new Date().toISOString() }])
+        if (invoice) setLastCreatedNum(invoice.num)
+
+      } else {
+        // ── Normal text response ─────────────────────────────────────────
+        const responseText = d1.text || ''
+        apiMsgs.current.push({ role: 'assistant', content: responseText })
+        setMessages(prev => [...prev, { role: 'assistant', content: responseText, timestamp: new Date().toISOString() }])
+      }
+
     } catch {
       toast.error('Erreur lors de la communication avec Claude')
     } finally {
@@ -101,19 +318,21 @@ export default function AgentPage() {
     }
   }
 
+  // ── Create custom agent ───────────────────────────────────────────────────
+
   function createAgent() {
     if (!newAgent.name || !newAgent.systemPrompt) {
       toast.error('Nom et prompt système requis')
       return
     }
     const agent: AIAgent = {
-      id: Date.now().toString(),
-      name: newAgent.name,
-      description: newAgent.description,
+      id:           Date.now().toString(),
+      name:         newAgent.name,
+      description:  newAgent.description,
       systemPrompt: newAgent.systemPrompt,
-      model: 'claude-sonnet-4-6',
-      active: true,
-      createdAt: new Date().toISOString().split('T')[0],
+      model:        'claude-sonnet-4-6',
+      active:       true,
+      createdAt:    new Date().toISOString().split('T')[0],
       conversations: 0,
     }
     setAgents(prev => [...prev, agent])
@@ -122,6 +341,8 @@ export default function AgentPage() {
     toast.success('Agent créé !')
     selectAgent(agent)
   }
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <AppLayout title="Agent IA" subtitle="Crée et interagis avec tes agents IA personnalisés">
@@ -153,10 +374,8 @@ export default function AgentPage() {
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-white/80 truncate">{agent.name}</p>
                     <p className="text-xs mt-0.5 line-clamp-2" style={{ color: 'rgba(255,255,255,0.35)' }}>{agent.description}</p>
-                    {agent.conversations !== undefined && (
-                      <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.25)' }}>
-                        {agent.conversations} conversations
-                      </p>
+                    {agent.id === '1' && (
+                      <p className="text-xs mt-1 text-violet-400/60 font-medium">Outil : création facture</p>
                     )}
                   </div>
                 </div>
@@ -198,8 +417,10 @@ export default function AgentPage() {
           ) : (
             <>
               {/* Chat header */}
-              <div className="px-5 py-3.5 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(124,58,237,0.15)' }}>
+              <div className="px-5 py-3.5 flex items-center gap-3"
+                style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+                  style={{ background: 'rgba(124,58,237,0.15)' }}>
                   <Bot className="w-4 h-4 text-violet-400" />
                 </div>
                 <div>
@@ -207,7 +428,7 @@ export default function AgentPage() {
                   <p className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{selected.model}</p>
                 </div>
                 <button
-                  onClick={() => { setSelected(null); setMessages([]) }}
+                  onClick={() => { setSelected(null); setMessages([]); apiMsgs.current = [] }}
                   className="ml-auto p-1.5 rounded-lg hover:bg-white/6 transition-colors"
                   style={{ color: 'rgba(255,255,255,0.25)' }}
                 >
@@ -242,14 +463,34 @@ export default function AgentPage() {
                     </div>
                   </div>
                 ))}
+
+                {/* Invoice created banner */}
+                {lastCreatedNum && !sending && (
+                  <div className="flex justify-start">
+                    <div className="ml-9 flex items-center gap-3 px-4 py-3 rounded-2xl text-sm"
+                      style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', borderBottomLeftRadius: '4px' }}>
+                      <FileText className="w-4 h-4 text-green-400 flex-shrink-0" />
+                      <span style={{ color: 'rgba(255,255,255,0.7)' }}>
+                        Facture <strong className="text-white">{lastCreatedNum}</strong> enregistrée
+                      </span>
+                      <Link href="/factures"
+                        className="ml-1 text-violet-400 hover:text-violet-300 font-semibold transition-colors text-xs">
+                        Voir les factures →
+                      </Link>
+                    </div>
+                  </div>
+                )}
+
                 {sending && (
                   <div className="flex items-start gap-2.5">
-                    <div className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ background: 'rgba(124,58,237,0.15)' }}>
+                    <div className="w-7 h-7 rounded-xl flex items-center justify-center"
+                      style={{ background: 'rgba(124,58,237,0.15)' }}>
                       <Bot className="w-3.5 h-3.5 text-violet-400" />
                     </div>
-                    <div className="px-4 py-3 rounded-2xl" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div className="px-4 py-3 rounded-2xl"
+                      style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
                       <div className="flex gap-1">
-                        {[0,1,2].map(i => (
+                        {[0, 1, 2].map(i => (
                           <div key={i} className="w-2 h-2 rounded-full bg-violet-400 animate-pulse"
                             style={{ animationDelay: `${i * 0.15}s` }} />
                         ))}
@@ -264,7 +505,7 @@ export default function AgentPage() {
               <div className="p-4 flex gap-2" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                 <input
                   className="input-dark flex-1"
-                  placeholder="Écris ton message…"
+                  placeholder={selected.id === '1' ? 'Ex: Facture pour Jean Dupont, 2 jours à 800€…' : 'Écris ton message…'}
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), sendMessage())}
