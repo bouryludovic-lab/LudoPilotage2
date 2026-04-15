@@ -27,7 +27,7 @@ export async function GET() {
     client_id:     clientId,
     redirect_uri:  redirectUri,
     response_type: 'code',
-    scope:         'https://www.googleapis.com/auth/gmail.readonly',
+    scope:         'https://www.googleapis.com/auth/gmail.modify',
     access_type:   'offline',  // ensures a refresh_token is issued
     prompt:        'consent',  // force consent so refresh_token always comes back
     state,

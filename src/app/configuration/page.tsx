@@ -203,7 +203,7 @@ function ConfigurationContent() {
                 <Mail className="w-3.5 h-3.5 mr-1.5" /> Connecter Gmail
               </Button>
               <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                Accès en lecture seule. Tes emails non lus apparaîtront dans le Hub après synchronisation.
+                Accès lecture + envoi. Tes emails non lus apparaîtront dans le Hub et tu pourras répondre directement.
               </p>
             </div>
           )}
