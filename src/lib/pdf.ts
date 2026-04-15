@@ -1,285 +1,204 @@
-import type { Invoice, Profil, InvoiceDesign } from './types'
+import type { Invoice, Profil } from './types'
 import { DEFAULT_DESIGN } from './types'
-import { formatEur, formatDate } from './utils'
 
-// ─── jsPDF dynamic import (avoids SSR issues) ─────────────────────────────────
-async function getJsPDF() {
-  const { jsPDF } = await import('jspdf')
-  return jsPDF
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function esc(v: unknown): string {
+  return String(v ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
 }
 
-type Doc = InstanceType<Awaited<ReturnType<typeof getJsPDF>>>
-
-// ─── Hex → [R,G,B] ───────────────────────────────────────────────────────────
-function hex(h: string): [number, number, number] {
-  const s = h.replace('#', '')
-  const n = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16)
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+function fmtDate(d: string): string {
+  if (!d) return '—'
+  try { return new Intl.DateTimeFormat('fr-FR').format(new Date(d)) } catch { return d }
 }
 
-// Darken a hex color by a fraction (0–1)
-function darken(h: string, amount = 0.2): [number, number, number] {
-  const [r, g, b] = hex(h)
-  return [Math.round(r * (1 - amount)), Math.round(g * (1 - amount)), Math.round(b * (1 - amount))]
+function fmtMoney(n: number): string {
+  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n)
 }
 
-// ─── Neutral palette (doesn't change with design) ────────────────────────────
-const N = {
-  slate900:  [15,  23,  42]  as [number, number, number],
-  slate700:  [51,  65,  85]  as [number, number, number],
-  slate500:  [100, 116, 139] as [number, number, number],
-  slate300:  [203, 213, 225] as [number, number, number],
-  slate100:  [241, 245, 249] as [number, number, number],
-  white:     [255, 255, 255] as [number, number, number],
+// ─── Logo SVG (same visual style as original MVP) ─────────────────────────────
+
+function buildLogoSvg(nom: string, primary: string, accent: string, tagline: string): string {
+  const words    = nom.trim().split(/\s+/)
+  const initials = words.slice(0, 3).map(w => w[0]?.toUpperCase() ?? '').join('')
+  const label    = esc(nom.toUpperCase())
+  const tag      = esc(tagline)
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 100" width="220" height="68">
+  <rect x="2" y="2" width="88" height="88" fill="white" stroke="${primary}" stroke-width="3"/>
+  <text x="44" y="52" font-family="Arial,sans-serif" font-size="28" font-weight="900" fill="${primary}" text-anchor="middle">${initials}</text>
+  <circle cx="44" cy="72" r="7" fill="${accent}"/>
+  <line x1="100" y1="10" x2="100" y2="82" stroke="#e0e0e0" stroke-width="1"/>
+  <text x="114" y="42" font-family="Arial,sans-serif" font-size="20" font-weight="700" fill="${primary}" letter-spacing="1">${label}</text>
+  <line x1="114" y1="52" x2="310" y2="52" stroke="${accent}" stroke-width="2"/>
+  <text x="114" y="70" font-family="Arial,sans-serif" font-size="10" font-weight="400" fill="#666" letter-spacing="2">${tag}</text>
+</svg>`
 }
 
-// ─── Drawing helpers ──────────────────────────────────────────────────────────
-function fillRect(doc: Doc, x: number, y: number, w: number, h: number, color: [number, number, number]) {
-  doc.setFillColor(...color)
-  doc.rect(x, y, w, h, 'F')
-}
+// ─── HTML invoice builder (matches original MVP design exactly) ───────────────
 
-function txt(doc: Doc, str: string, x: number, y: number, opts?: {
-  size?:  number
-  color?: [number, number, number]
-  bold?:  boolean
-  align?: 'left' | 'right' | 'center'
-}) {
-  if (!str) return
-  doc.setFontSize(opts?.size ?? 9)
-  doc.setTextColor(...(opts?.color ?? N.slate700))
-  doc.setFont('helvetica', opts?.bold ? 'bold' : 'normal')
-  doc.text(str, x, y, { align: opts?.align ?? 'left' })
-}
+export function buildInvoiceHTML(invoice: Invoice, profil: Profil): string {
+  const design  = { ...DEFAULT_DESIGN, ...(profil.design ?? {}) }
+  const PRIMARY = design.primaryColor  // e.g. #1a2744
+  const ACCENT  = design.accentColor   // e.g. #2563eb
 
-function hline(doc: Doc, x1: number, y: number, x2: number, color: [number, number, number], lw = 0.3) {
-  doc.setDrawColor(...color)
-  doc.setLineWidth(lw)
-  doc.line(x1, y, x2, y)
-}
+  // Logo: use uploaded logo image or generate SVG from initials
+  const logoHtml = profil.logo
+    ? `<img src="${profil.logo}" style="max-height:68px;max-width:220px;object-fit:contain" alt="Logo"/>`
+    : buildLogoSvg(profil.nom || 'LP', PRIMARY, ACCENT, design.tagline)
 
-// ─── Main generator ───────────────────────────────────────────────────────────
-export async function generateInvoicePdf(invoice: Invoice, profil: Profil): Promise<string> {
-  const JsPDF = await getJsPDF()
-  const doc   = new JsPDF({ unit: 'mm', format: 'a4' })
-
-  const d: InvoiceDesign = { ...DEFAULT_DESIGN, ...(profil.design ?? {}) }
-  const PRIMARY = hex(d.primaryColor)
-  const ACCENT  = hex(d.accentColor)
-  const ACCENT_D = darken(d.accentColor, 0.15)
-
-  const PW = 210
-  const M  = 15
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // 1. HEADER BAND
-  // ══════════════════════════════════════════════════════════════════════════
-  fillRect(doc, 0, 0, PW, 42, PRIMARY)
-
-  // Logo or text fallback
-  if (profil.logo) {
-    try {
-      const ext = profil.logo.startsWith('data:image/png') ? 'PNG' : 'JPEG'
-      doc.addImage(profil.logo, ext, M, 8, 26, 26)
-    } catch {}
-  } else {
-    // Square logo placeholder with accent color
-    fillRect(doc, M, 8, 28, 26, ACCENT)
-    const initials = (profil.nom || 'TNS').split(' ').map(w => w[0]).join('').slice(0, 3).toUpperCase()
-    txt(doc, initials, M + 14, 23.5, { size: 12, color: N.white, bold: true, align: 'center' })
-  }
-
-  // Company name + tagline
-  const textX = M + 34
-  txt(doc, (profil.nom || '').toUpperCase(), textX, 18, { size: 13, color: N.white, bold: true })
-  txt(doc, d.tagline, textX, 24.5, { size: 7.5, color: [148, 163, 184] })
-  if (profil.siret) {
-    txt(doc, `SIRET ${profil.siret}`, textX, 30, { size: 7, color: [100, 116, 139] })
-  }
-
-  // Invoice badge (top-right)
-  fillRect(doc, PW - M - 48, 10, 48, 22, ACCENT)
-  txt(doc, 'FACTURE', PW - M - 24, 19, { size: 9, color: N.white, bold: true, align: 'center' })
-  txt(doc, invoice.num, PW - M - 24, 26, { size: 9.5, color: N.white, bold: true, align: 'center' })
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // 2. DATE / ECHÉANCE / PAIEMENT ROW
-  // ══════════════════════════════════════════════════════════════════════════
-  fillRect(doc, 0, 42, PW, 11, N.slate100)
-  txt(doc, `Date d'émission : ${formatDate(invoice.date)}`,        M,        48, { size: 8, color: N.slate700 })
-  txt(doc, `Échéance : ${invoice.echeanceLabel || '30 jours'}`,   PW / 2,   48, { size: 8, color: N.slate700, align: 'center' })
-  txt(doc, `Paiement : ${invoice.paiement}`,                      PW - M,   48, { size: 8, color: N.slate700, align: 'right' })
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // 3. ADDRESSES  (DE / À)
-  // ══════════════════════════════════════════════════════════════════════════
-  let y = 62
-
-  // — Emetteur (left) ———————————————————————————————————————————————————————
-  txt(doc, 'DE', M, y, { size: 7, color: N.slate500, bold: true })
-  doc.setDrawColor(...ACCENT)
-  doc.setLineWidth(0.5)
-  doc.line(M + 8, y - 0.5, M + 24, y - 0.5)
-  y += 5
-
-  txt(doc, profil.nom || '', M, y, { size: 9.5, color: N.slate900, bold: true })
-  y += 5.5
-
-  if (profil.adresse) {
-    const lines = profil.adresse.split(/[,\n]/).map(s => s.trim()).filter(Boolean)
-    for (const l of lines) { txt(doc, l, M, y, { size: 8, color: N.slate700 }); y += 4.5 }
-  }
-  if (profil.email) { txt(doc, profil.email, M, y, { size: 8, color: N.slate700 }); y += 4.5 }
-  if (profil.tel)   { txt(doc, profil.tel,   M, y, { size: 8, color: N.slate700 }); y += 4.5 }
-  if (profil.siret) { txt(doc, `SIRET : ${profil.siret}`, M, y, { size: 8, color: N.slate500 }) }
-
-  // — Destinataire (right) ——————————————————————————————————————————————————
-  let yr = 62
-  const rx = PW / 2 + 5
-
-  txt(doc, 'FACTURÉ À', rx, yr, { size: 7, color: N.slate500, bold: true })
-  doc.setDrawColor(...ACCENT)
-  doc.setLineWidth(0.5)
-  doc.line(rx, yr + 1, PW - M, yr + 1)
-  yr += 5
-
-  txt(doc, invoice.clientNom, rx, yr, { size: 9.5, color: N.slate900, bold: true })
-  yr += 5.5
-
-  if (invoice.clientAdresse) {
-    const lines = invoice.clientAdresse.split(/[,\n]/).map(s => s.trim()).filter(Boolean)
-    for (const l of lines) { txt(doc, l, rx, yr, { size: 8, color: N.slate700 }); yr += 4.5 }
-  }
-  if (invoice.clientSiret) { txt(doc, `SIRET : ${invoice.clientSiret}`, rx, yr, { size: 8, color: N.slate500 }); yr += 4.5 }
-  if (invoice.clientEmail) { txt(doc, invoice.clientEmail, rx, yr, { size: 8, color: N.slate700 }) }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // 4. LINE ITEMS TABLE
-  // ══════════════════════════════════════════════════════════════════════════
-  y = Math.max(y, yr) + 12
-
-  const COL = { desc: M, qte: 122, pu: 150, tot: PW - M - 2 }
-
-  // Table header
-  fillRect(doc, M, y, PW - 2 * M, 8, PRIMARY)
-  txt(doc, 'PRESTATION',     COL.desc + 3, y + 5.2, { size: 7.5, color: N.white, bold: true })
-  txt(doc, 'QTÉ',            COL.qte,      y + 5.2, { size: 7.5, color: N.white, bold: true, align: 'center' })
-  txt(doc, 'P.U. HT',        COL.pu,       y + 5.2, { size: 7.5, color: N.white, bold: true, align: 'right' })
-  txt(doc, 'TOTAL HT',       COL.tot,      y + 5.2, { size: 7.5, color: N.white, bold: true, align: 'right' })
-  y += 8
-
-  // Line rows
+  // Line items
   const lignes = Array.isArray(invoice.lignes) ? invoice.lignes : []
-  if (lignes.length === 0) {
-    // Graceful fallback if no lines
-    fillRect(doc, M, y, PW - 2 * M, 8, N.white)
-    txt(doc, '(aucune prestation)', COL.desc + 3, y + 5.2, { size: 8, color: N.slate500 })
-    y += 8
-  } else {
-    for (let i = 0; i < lignes.length; i++) {
-      const ligne  = lignes[i]
-      const rowH   = 9
-      const bg     = i % 2 === 0 ? N.white : N.slate100
-      fillRect(doc, M, y, PW - 2 * M, rowH, bg)
-      hline(doc, M, y + rowH, PW - M, N.slate300, 0.2)
+  const rows = lignes.length > 0
+    ? lignes.map(l => `
+        <tr>
+          <td style="padding:10px 16px;border-bottom:1px solid #eef2f7;font-size:13px">${esc(l.desc)}</td>
+          <td style="padding:10px 16px;border-bottom:1px solid #eef2f7;font-size:13px;text-align:center">${l.qte}</td>
+          <td style="padding:10px 16px;border-bottom:1px solid #eef2f7;font-size:13px;text-align:right">${fmtMoney(l.pu)}</td>
+          <td style="padding:10px 16px;border-bottom:1px solid #eef2f7;font-size:13px;text-align:right;font-weight:700">${fmtMoney(l.qte * l.pu)}</td>
+        </tr>`).join('')
+    : `<tr><td colspan="4" style="padding:16px;text-align:center;color:#aaa;font-size:13px">Aucune prestation renseignée</td></tr>`
 
-      const lineTotal = (ligne.qte ?? 0) * (ligne.pu ?? 0)
-      txt(doc, ligne.desc ?? '',           COL.desc + 3, y + 5.8, { size: 8.5, color: N.slate900 })
-      txt(doc, String(ligne.qte ?? 1),     COL.qte,      y + 5.8, { size: 8.5, color: N.slate700, align: 'center' })
-      txt(doc, formatEur(ligne.pu ?? 0),   COL.pu,       y + 5.8, { size: 8.5, color: N.slate700, align: 'right' })
-      txt(doc, formatEur(lineTotal),        COL.tot,      y + 5.8, { size: 8.5, color: N.slate900, bold: true, align: 'right' })
-      y += rowH
+  // Bank details from design config
+  const bankName    = design.bankName    || ''
+  const bankBicIban = [
+    design.bic   ? `BIC : ${esc(design.bic)}`      : '',
+    profil.iban  ? `IBAN : ${esc(profil.iban)}`    : '',
+  ].filter(Boolean).join(' &nbsp;|&nbsp; ')
+  const bankHolder  = design.titulaire   ? `Titulaire : ${esc(design.titulaire)}`  : ''
+  const bankDetails = design.bankDetails ? esc(design.bankDetails) : ''
+
+  const bankLines = [bankName ? esc(bankName) : '', bankBicIban, bankHolder, bankDetails]
+    .filter(Boolean).join('<br>')
+
+  return `
+<div id="invoice-root" style="background:white;font-family:Arial,Helvetica,sans-serif;padding:0;width:700px">
+<div style="padding:36px 44px">
+
+  <!-- Header: logo + FACTURE block -->
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:36px">
+    <div>${logoHtml}</div>
+    <div style="text-align:right">
+      <div style="font-size:18px;font-weight:700;color:${PRIMARY};letter-spacing:.5px;text-transform:uppercase">FACTURE</div>
+      <div style="font-size:14px;font-weight:600;color:${ACCENT};margin-top:4px">N° ${esc(invoice.num)}</div>
+      <div style="font-size:11px;color:#888;margin-top:6px">Émise le ${fmtDate(invoice.date)}</div>
+      <div style="font-size:11px;color:#888">Échéance : ${esc(invoice.echeanceLabel || fmtDate(invoice.echeance))}</div>
+      <div style="font-size:11px;color:#888">Règlement : ${esc(invoice.paiement)}</div>
+    </div>
+  </div>
+
+  <!-- From / To -->
+  <div style="display:flex;gap:32px;margin-bottom:32px">
+    <div style="flex:1">
+      <div style="font-size:10px;font-weight:700;color:${ACCENT};text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">De</div>
+      <div style="font-weight:700;font-size:14px;color:${PRIMARY}">${esc(profil.nom || '—')}</div>
+      <div style="font-size:12px;color:#555;line-height:1.7">${esc(profil.adresse || '')}</div>
+      <div style="font-size:12px;color:#555">${esc(profil.email || '')}${profil.tel ? ' &nbsp;·&nbsp; ' + esc(profil.tel) : ''}</div>
+      ${profil.siret ? `<div style="font-size:11px;color:#aaa;margin-top:3px">SIRET : ${esc(profil.siret)}</div>` : ''}
+    </div>
+    <div style="flex:1">
+      <div style="font-size:10px;font-weight:700;color:${ACCENT};text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">Facturé à</div>
+      <div style="font-weight:700;font-size:14px;color:${PRIMARY}">${esc(invoice.clientNom || '—')}</div>
+      <div style="font-size:12px;color:#555;line-height:1.7">${esc(invoice.clientAdresse || '')}</div>
+      ${invoice.clientEmail ? `<div style="font-size:12px;color:#555">${esc(invoice.clientEmail)}</div>` : ''}
+      ${invoice.clientSiret ? `<div style="font-size:11px;color:#aaa;margin-top:3px">SIRET : ${esc(invoice.clientSiret)}</div>` : ''}
+    </div>
+  </div>
+
+  <!-- Prestations table -->
+  <table style="width:100%;border-collapse:collapse;margin-bottom:24px">
+    <thead>
+      <tr style="background:#e8e8e8;border-bottom:2px solid ${PRIMARY}">
+        <th style="padding:10px 16px;text-align:left;font-size:11px;color:${PRIMARY};font-weight:700;text-transform:uppercase;letter-spacing:.5px">Prestation</th>
+        <th style="padding:10px 16px;text-align:center;font-size:11px;color:${PRIMARY};font-weight:700;text-transform:uppercase;letter-spacing:.5px">Qté</th>
+        <th style="padding:10px 16px;text-align:right;font-size:11px;color:${PRIMARY};font-weight:700;text-transform:uppercase;letter-spacing:.5px">P.U. HT</th>
+        <th style="padding:10px 16px;text-align:right;font-size:11px;color:${PRIMARY};font-weight:700;text-transform:uppercase;letter-spacing:.5px">Total HT</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+
+  <!-- Totals -->
+  <div style="display:flex;justify-content:flex-end;margin-bottom:36px">
+    <div style="min-width:260px">
+      <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;color:#888;border-bottom:1px solid #eee">
+        <span>Sous-total HT</span>
+        <span style="font-weight:600;color:#333">${fmtMoney(invoice.total)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:11px;color:#bbb">
+        <span>TVA</span>
+        <span>Non applicable — art. 293 B CGI</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:12px 16px;font-size:16px;font-weight:700;background:${PRIMARY};color:white;border-radius:8px;margin-top:8px">
+        <span>Total à payer</span>
+        <span style="color:#5dd4f0">${fmtMoney(invoice.total)}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bank details -->
+  <div style="border-top:2px solid ${PRIMARY};padding-top:20px">
+    <div style="font-size:11px;font-weight:700;color:${PRIMARY};text-transform:uppercase;letter-spacing:1.2px;margin-bottom:10px">Coordonnées bancaires</div>
+    ${bankLines
+      ? `<div style="font-size:12px;color:#444;line-height:1.8">${bankLines}</div>`
+      : `<div style="font-size:12px;color:#aaa">IBAN non configuré — rendez-vous dans Modèle facture</div>`
     }
-  }
+    <div style="font-size:12px;font-weight:700;color:${PRIMARY};margin-top:10px">${esc(invoice.paiement)}</div>
+    ${invoice.notes ? `<div style="font-size:12px;color:#555;margin-top:10px;padding:10px;background:#f8f8f8;border-radius:6px">${esc(invoice.notes)}</div>` : ''}
+    <div style="font-size:10px;color:#ccc;margin-top:14px">TVA non applicable, article 293 B du CGI — Micro-entrepreneur</div>
+  </div>
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // 5. TOTALS BLOCK
-  // ══════════════════════════════════════════════════════════════════════════
-  y += 6
-  const tbX = PW / 2 + 5
-  const tbW = PW - M - tbX
-
-  fillRect(doc, tbX, y, tbW, 7, N.slate100)
-  txt(doc, 'Sous-total HT',           tbX + 4,   y + 4.8, { size: 8, color: N.slate700 })
-  txt(doc, formatEur(invoice.total),  PW - M - 3, y + 4.8, { size: 8, color: N.slate900, bold: true, align: 'right' })
-  y += 7
-
-  fillRect(doc, tbX, y, tbW, 7, N.white)
-  hline(doc, tbX, y, tbX + tbW, N.slate300, 0.2)
-  txt(doc, 'TVA',                              tbX + 4,   y + 4.8, { size: 8, color: N.slate500 })
-  txt(doc, 'Non applicable — art. 293 B CGI', PW - M - 3, y + 4.8, { size: 7.5, color: N.slate500, align: 'right' })
-  y += 7
-
-  fillRect(doc, tbX, y, tbW, 10, PRIMARY)
-  txt(doc, 'Total à payer',           tbX + 4,    y + 6.8, { size: 9, color: N.white, bold: true })
-  txt(doc, formatEur(invoice.total),  PW - M - 3, y + 6.8, { size: 10, color: N.white, bold: true, align: 'right' })
-  y += 10
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // 6. BANK DETAILS
-  // ══════════════════════════════════════════════════════════════════════════
-  const hasBank = !!(profil.iban || invoice.iban || d.bic || d.bankName)
-  if (hasBank) {
-    y += 10
-    hline(doc, M, y, PW - M, N.slate300)
-    y += 5
-
-    txt(doc, 'BANK DETAILS', M, y, { size: 8, color: N.slate900, bold: true })
-    y += 5.5
-
-    const iban  = profil.iban || invoice.iban || ''
-    const titul = d.titulaire || profil.nom || ''
-
-    if (d.bankName)   { txt(doc, d.bankName,          M, y, { size: 8, color: N.slate700 }); y += 4.5 }
-    if (titul)        { txt(doc, `Titulaire du compte : ${titul}`, M, y, { size: 8, color: N.slate700 }); y += 4.5 }
-
-    // BIC + IBAN on same line
-    const bicIban = [d.bic ? `BIC : ${d.bic}` : '', iban ? `IBAN : ${iban}` : ''].filter(Boolean).join('   |   ')
-    if (bicIban) { txt(doc, bicIban, M, y, { size: 8, color: N.slate900, bold: true }); y += 4.5 }
-
-    if (d.bankDetails) { txt(doc, d.bankDetails, M, y, { size: 7.5, color: N.slate700 }); y += 4.5 }
-
-    txt(doc, `Paiement : ${invoice.paiement}`, M, y, { size: 8, color: N.slate700 })
-  }
-
-  // Notes
-  if (invoice.notes) {
-    y += hasBank ? 8 : 10
-    hline(doc, M, y, PW - M, N.slate300)
-    y += 5
-    txt(doc, 'NOTES', M, y, { size: 7.5, color: N.slate500, bold: true })
-    y += 4.5
-    const noteLines = doc.splitTextToSize(invoice.notes, PW - 2 * M - 10) as string[]
-    for (const l of noteLines) { txt(doc, l, M, y, { size: 8, color: N.slate700 }); y += 4.5 }
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // 7. FOOTER
-  // ══════════════════════════════════════════════════════════════════════════
-  const FY = 285
-  fillRect(doc, 0, FY, PW, 12, N.slate100)
-  hline(doc, 0, FY, PW, N.slate300)
-  txt(doc,
-    'TVA non applicable, article 293B du CGI',
-    PW / 2, FY + 4.5,
-    { size: 7, color: N.slate500, align: 'center' }
-  )
-  const footerParts = [profil.nom, profil.siret ? `SIRET ${profil.siret}` : '', profil.adresse].filter(Boolean)
-  txt(doc, footerParts.join(' • '), PW / 2, FY + 8.5, { size: 6.5, color: N.slate500, align: 'center' })
-
-  return doc.output('datauristring')
+</div>
+</div>`
 }
 
-// ─── Download helper ──────────────────────────────────────────────────────────
-export async function downloadInvoicePdf(invoice: Invoice, profil: Profil): Promise<void> {
-  const uri  = await generateInvoicePdf(invoice, profil)
-  const link = document.createElement('a')
-  link.href     = uri
-  link.download = `${invoice.num}.pdf`
-  link.click()
+// ─── PDF generation via jsPDF html() + html2canvas ───────────────────────────
+
+export async function generateInvoicePdf(invoice: Invoice, profil: Profil): Promise<string> {
+  const html = buildInvoiceHTML(invoice, profil)
+
+  // Mount hidden element (must be in DOM for html2canvas)
+  const wrapper = document.createElement('div')
+  wrapper.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;z-index:-1'
+  wrapper.innerHTML     = html
+  document.body.appendChild(wrapper)
+
+  try {
+    const { jsPDF } = await import('jspdf')
+    await import('html2canvas') // ensure loaded for jsPDF html plugin
+
+    const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' })
+    const el  = wrapper.firstElementChild as HTMLElement
+
+    await new Promise<void>((resolve, reject) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(doc as any).html(el, {
+        callback:    (pdf: typeof doc) => { void pdf; resolve() },
+        x:           0,
+        y:           0,
+        width:       595,       // A4 width in pt
+        windowWidth: 794,       // element pixel width → scale to A4
+        margin:      0,
+        autoPaging:  'text',
+        html2canvas: {
+          scale:       1.5,
+          useCORS:     true,
+          allowTaint:  true,
+          logging:     false,
+        },
+      })
+    })
+
+    return doc.output('datauristring')
+  } finally {
+    document.body.removeChild(wrapper)
+  }
 }
 
-// ─── Base64 string (no data URI prefix) ──────────────────────────────────────
+// ─── Base64 variant (for GitHub upload) ──────────────────────────────────────
+
 export async function generatePdfBase64(invoice: Invoice, profil: Profil): Promise<string> {
   const uri = await generateInvoicePdf(invoice, profil)
   return uri.split('base64,')[1] ?? ''
