@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { AppLayout } from '@/components/layout/AppLayout'
 import {
   MessageSquare, Filter, CheckCheck, AlertCircle, Clock,
-  Loader2, Mail, RefreshCw, X, Reply, Send, Pencil,
+  Loader2, Mail, RefreshCw, X, Reply, Send, Pencil, Paperclip,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -32,6 +32,12 @@ const PRIORITY_CONFIG: Record<HubPriority, { label: string; variant: 'red' | 'am
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+interface AttachmentItem {
+  name:   string
+  type:   string
+  base64: string
+}
+
 interface MsgDetail {
   id:             string
   threadId:       string
@@ -51,6 +57,28 @@ function getTokens() {
 
 function getUserEmail() {
   return typeof window !== 'undefined' ? (localStorage.getItem('at_token') ?? '') : ''
+}
+
+function readFilesAsBase64(
+  files: FileList | null,
+  setter: React.Dispatch<React.SetStateAction<AttachmentItem[]>>
+) {
+  if (!files) return
+  Array.from(files).forEach(file => {
+    if (file.size > 4 * 1024 * 1024) {
+      // Warn but don't import toast here — use a simple alert instead;
+      // the component will handle this inline
+      console.warn(`${file.name} too large`)
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = e => {
+      const dataUrl = e.target?.result as string
+      const base64  = dataUrl.split(',')[1] ?? ''
+      setter(prev => [...prev, { name: file.name, type: file.type || 'application/octet-stream', base64 }])
+    }
+    reader.readAsDataURL(file)
+  })
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -73,11 +101,17 @@ export default function HubPage() {
   const [sending,       setSending]       = useState(false)
 
   // Compose modal state
-  const [showCompose,    setShowCompose]    = useState(false)
-  const [composeTo,      setComposeTo]      = useState('')
-  const [composeSubject, setComposeSubject] = useState('')
-  const [composeBody,    setComposeBody]    = useState('')
-  const [composeSending, setComposeSending] = useState(false)
+  const [showCompose,       setShowCompose]       = useState(false)
+  const [composeTo,         setComposeTo]         = useState('')
+  const [composeSubject,    setComposeSubject]    = useState('')
+  const [composeBody,       setComposeBody]       = useState('')
+  const [composeSending,    setComposeSending]    = useState(false)
+  const [composeAttachments, setComposeAttachments] = useState<AttachmentItem[]>([])
+  const [replyAttachments,   setReplyAttachments]   = useState<AttachmentItem[]>([])
+
+  // File input refs (hidden)
+  const composeFileRef = useRef<HTMLInputElement>(null)
+  const replyFileRef   = useRef<HTMLInputElement>(null)
 
   // ── Load Airtable hub_messages on mount ──────────────────────────────────
   useEffect(() => {
@@ -181,6 +215,7 @@ export default function HubPage() {
     setMsgDetail(null)
     setShowReply(false)
     setReplyBody('')
+    setReplyAttachments([])
 
     if (!msg.id.startsWith('gmail_')) return
 
@@ -239,6 +274,7 @@ export default function HubPage() {
           threadId:     msgDetail.threadId,
           inReplyTo:    msgDetail.gmailMessageId,
           references:   msgDetail.gmailMessageId,
+          attachments:  replyAttachments,
           accessToken:  tokens.accessToken,
           refreshToken: tokens.refreshToken,
           expiresAt:    tokens.expiresAt,
@@ -252,6 +288,7 @@ export default function HubPage() {
         toast.success('Réponse envoyée !')
         setShowReply(false)
         setReplyBody('')
+        setReplyAttachments([])
       } else {
         toast.error(data.error ?? 'Erreur lors de l\'envoi')
       }
@@ -277,9 +314,10 @@ export default function HubPage() {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
-          to:           composeTo,
-          subject:      composeSubject,
-          body:         composeBody,
+          to:          composeTo,
+          subject:     composeSubject,
+          body:        composeBody,
+          attachments: composeAttachments,
           accessToken:  tokens.accessToken,
           refreshToken: tokens.refreshToken,
           expiresAt:    tokens.expiresAt,
@@ -295,6 +333,7 @@ export default function HubPage() {
         setComposeTo('')
         setComposeSubject('')
         setComposeBody('')
+        setComposeAttachments([])
       } else {
         toast.error(data.error ?? 'Erreur lors de l\'envoi')
       }
@@ -550,12 +589,36 @@ export default function HubPage() {
                       className="w-full text-sm px-3 py-2.5 rounded-xl resize-none outline-none"
                       style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}
                     />
-                    <div className="flex items-center justify-between">
-                      <button onClick={() => { setShowReply(false); setReplyBody('') }}
-                        className="text-xs px-3 py-1.5 rounded-xl"
-                        style={{ color: 'rgba(255,255,255,0.35)' }}>
-                        Annuler
-                      </button>
+                    {/* Attached files */}
+                  {replyAttachments.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {replyAttachments.map((att, i) => (
+                        <div key={i} className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs"
+                          style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)' }}>
+                          <Paperclip className="w-3 h-3 flex-shrink-0" />
+                          <span className="truncate max-w-[100px]">{att.name}</span>
+                          <button onClick={() => setReplyAttachments(p => p.filter((_, j) => j !== i))}>
+                            <X className="w-3 h-3 ml-0.5 hover:text-white" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => { setShowReply(false); setReplyBody(''); setReplyAttachments([]) }}
+                          className="text-xs px-3 py-1.5 rounded-xl"
+                          style={{ color: 'rgba(255,255,255,0.35)' }}>
+                          Annuler
+                        </button>
+                        <button onClick={() => replyFileRef.current?.click()}
+                          className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl"
+                          style={{ color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                          <Paperclip className="w-3 h-3" /> Joindre
+                        </button>
+                        <input ref={replyFileRef} type="file" multiple className="hidden"
+                          onChange={e => { readFilesAsBase64(e.target.files, setReplyAttachments); e.target.value = '' }} />
+                      </div>
                       <button onClick={sendReply}
                         disabled={sending || !replyBody.trim()}
                         className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-semibold transition-all"
@@ -608,8 +671,34 @@ export default function HubPage() {
               className="w-full text-sm px-3 py-2.5 rounded-xl resize-none outline-none"
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'white' }} />
 
-            <div className="flex items-center justify-end gap-2">
-              <button onClick={() => setShowCompose(false)} className="text-xs px-3 py-2 rounded-xl"
+            {/* Attached files */}
+            {composeAttachments.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {composeAttachments.map((att, i) => (
+                  <div key={i} className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs"
+                    style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)' }}>
+                    <Paperclip className="w-3 h-3 flex-shrink-0" />
+                    <span className="truncate max-w-[140px]">{att.name}</span>
+                    <button onClick={() => setComposeAttachments(p => p.filter((_, j) => j !== i))}>
+                      <X className="w-3 h-3 ml-0.5 hover:text-white" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <button onClick={() => composeFileRef.current?.click()}
+                  className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl"
+                  style={{ color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <Paperclip className="w-3.5 h-3.5" /> Joindre un fichier
+                </button>
+                <input ref={composeFileRef} type="file" multiple className="hidden"
+                  onChange={e => { readFilesAsBase64(e.target.files, setComposeAttachments); e.target.value = '' }} />
+              </div>
+              <div className="flex items-center gap-2">
+              <button onClick={() => { setShowCompose(false); setComposeAttachments([]) }} className="text-xs px-3 py-2 rounded-xl"
                 style={{ color: 'rgba(255,255,255,0.35)' }}>
                 Annuler
               </button>
@@ -624,6 +713,7 @@ export default function HubPage() {
                 {composeSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 Envoyer
               </button>
+              </div>
             </div>
           </div>
         </div>

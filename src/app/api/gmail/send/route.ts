@@ -24,31 +24,81 @@ async function refreshAccessToken(
   }
 }
 
-// ── RFC 2822 builder ──────────────────────────────────────────────────────────
+// ── RFC 2822 / MIME builder ───────────────────────────────────────────────────
+
+interface Attachment {
+  name:   string
+  type:   string   // MIME type, e.g. "application/pdf"
+  base64: string   // raw base64 (no data URI prefix)
+}
 
 function buildRawEmail(params: {
   to: string
   subject: string
   body: string
-  inReplyTo?: string
+  inReplyTo?:  string
   references?: string
+  attachments?: Attachment[]
 }): string {
-  const lines = [
-    `To: ${params.to}`,
-    `Subject: ${params.subject}`,
-    'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=utf-8',
-  ]
+  const { to, subject, body, inReplyTo, references, attachments = [] } = params
 
-  if (params.inReplyTo) {
-    lines.push(`In-Reply-To: ${params.inReplyTo}`)
-    lines.push(`References: ${params.references || params.inReplyTo}`)
+  // ── Simple text email (no attachments) ─────────────────────────────────────
+  if (attachments.length === 0) {
+    const lines = [
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/plain; charset=utf-8',
+    ]
+    if (inReplyTo) {
+      lines.push(`In-Reply-To: ${inReplyTo}`)
+      lines.push(`References: ${references || inReplyTo}`)
+    }
+    lines.push('')
+    lines.push(body)
+    return lines.join('\r\n')
   }
 
-  lines.push('')        // blank line separates headers from body
-  lines.push(params.body)
+  // ── Multipart/mixed email (with attachments) ──────────────────────────────
+  const boundary = `----=_NextPart_${Date.now().toString(36)}`
 
-  return lines.join('\r\n')
+  const headers = [
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    'MIME-Version: 1.0',
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+  ]
+  if (inReplyTo) {
+    headers.push(`In-Reply-To: ${inReplyTo}`)
+    headers.push(`References: ${references || inReplyTo}`)
+  }
+
+  const parts: string[] = [
+    headers.join('\r\n'),
+    '',
+    `--${boundary}`,
+    'Content-Type: text/plain; charset=utf-8',
+    '',
+    body,
+  ]
+
+  for (const att of attachments) {
+    const safeName = att.name.replace(/"/g, '')
+    const safeType = att.type || 'application/octet-stream'
+    // RFC 2045: base64 lines must be ≤76 chars
+    const b64Lines = (att.base64.match(/.{1,76}/g) ?? []).join('\r\n')
+    parts.push(
+      `--${boundary}`,
+      `Content-Type: ${safeType}; name="${safeName}"`,
+      `Content-Disposition: attachment; filename="${safeName}"`,
+      'Content-Transfer-Encoding: base64',
+      '',
+      b64Lines,
+    )
+  }
+
+  parts.push(`--${boundary}--`)
+  return parts.join('\r\n')
 }
 
 function encodeBase64Url(str: string): string {
@@ -80,6 +130,7 @@ export async function POST(req: NextRequest) {
     const {
       to, subject, body,
       threadId, inReplyTo, references,
+      attachments,
       accessToken, refreshToken, expiresAt,
     } = await req.json()
 
@@ -108,7 +159,7 @@ export async function POST(req: NextRequest) {
       newExpiresAt   = refreshed.expiresAt
     }
 
-    const raw = encodeBase64Url(buildRawEmail({ to, subject, body, inReplyTo, references }))
+    const raw = encodeBase64Url(buildRawEmail({ to, subject, body, inReplyTo, references, attachments }))
 
     const payload: Record<string, unknown> = { raw }
     if (threadId) payload.threadId = threadId
