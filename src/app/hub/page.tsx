@@ -1,12 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { AppLayout } from '@/components/layout/AppLayout'
-import { MessageSquare, Slack, Filter, CheckCheck, AlertCircle, Clock } from 'lucide-react'
+import { MessageSquare, Filter, CheckCheck, AlertCircle, Clock, Loader2, Mail, RefreshCw } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { EmptyState } from '@/components/ui/EmptyState'
 import type { HubMessage, HubSource, HubPriority } from '@/lib/types'
+import { AT_TABLES, AT_FIELDS } from '@/lib/types'
 import { formatDate } from '@/lib/utils'
+import { storage } from '@/lib/storage'
 
 const SOURCE_CONFIG: Record<HubSource, { label: string; color: string; bg: string }> = {
   circle:   { label: 'Circle',   color: '#60A5FA', bg: 'rgba(96,165,250,0.1)' },
@@ -22,18 +25,139 @@ const PRIORITY_CONFIG: Record<HubPriority, { label: string; variant: 'red' | 'am
   low:    { label: 'Faible', variant: 'slate' },
 }
 
-const DEMO: HubMessage[] = [
-  { id:'1', source:'circle',   author:'Marie D.',   content:"Nouvelle question sur la formation — besoin d'une réponse urgente", date:'2026-04-14', priority:'high',   read:false, tags:['formation'], actionRequired:true },
-  { id:'2', source:'slack',    author:'Team Dev',   content:'Deploy en production réussi. Tout est OK côté serveur',            date:'2026-04-14', priority:'low',    read:false, tags:['dev'] },
-  { id:'3', source:'whatsapp', author:'Client A',   content:"Facture reçue, merci ! Virement fait aujourd'hui",                 date:'2026-04-13', priority:'medium', read:true,  tags:['paiement'] },
-  { id:'4', source:'email',    author:'Prospect B', content:'Intéressé par votre accompagnement coaching — disponible cette semaine ?', date:'2026-04-13', priority:'high', read:false, tags:['coaching'], actionRequired:true },
-  { id:'5', source:'circle',   author:'Thomas R.',  content:'Super contenu dans le module 3 ! Question sur exercice 4',         date:'2026-04-12', priority:'medium', read:true,  tags:['formation'] },
-]
-
 export default function HubPage() {
-  const [filter, setFilter]     = useState<HubSource | 'all'>('all')
+  const [filter, setFilter]         = useState<HubSource | 'all'>('all')
   const [showUnread, setShowUnread] = useState(false)
-  const [messages, setMessages] = useState<HubMessage[]>(DEMO)
+  const [messages, setMessages]     = useState<HubMessage[]>([])
+  const [loading, setLoading]       = useState(true)
+  const [syncing, setSyncing]       = useState(false)
+  const [gmailConnected, setGmailConnected] = useState(false)
+
+  // ── Load Airtable hub_messages on mount ────────────────────────────────────
+  useEffect(() => {
+    const userEmail = typeof window !== 'undefined'
+      ? (localStorage.getItem('at_token') ?? '')
+      : ''
+
+    // Check if Gmail is connected
+    const tokens = storage.getGmailTokens()
+    if (tokens?.refreshToken) setGmailConnected(true)
+
+    async function loadMessages() {
+      try {
+        const F = AT_FIELDS.hub_messages
+        const res = await fetch('/api/airtable', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            table:          AT_TABLES.hub_messages,
+            method:         'GET',
+            useFieldNames:  true,
+            query:          userEmail
+              ? `filterByFormula=${encodeURIComponent(`{${F.user_email}}="${userEmail}"`)}&sort[0][field]=date&sort[0][direction]=desc`
+              : undefined,
+          }),
+        })
+
+        if (!res.ok) throw new Error(`Airtable ${res.status}`)
+        const data = await res.json()
+
+        const atMessages: HubMessage[] = (data.records ?? []).map(
+          (rec: { id: string; fields: Record<string, unknown> }) => {
+            const f = rec.fields
+            return {
+              id:             rec.id,
+              source:         (String(f[F.source] ?? 'email')) as HubSource,
+              author:         String(f[F.author]  ?? ''),
+              content:        String(f[F.content] ?? ''),
+              date:           String(f[F.date]    ?? ''),
+              priority:       (String(f[F.priority] ?? 'medium')) as HubPriority,
+              read:           Boolean(f[F.read]),
+              tags:           (() => {
+                try { return JSON.parse(String(f[F.tags] ?? '[]')) } catch { return [] }
+              })(),
+              actionRequired: Boolean(f[F.action_required]),
+              userEmail:      String(f[F.user_email] ?? ''),
+            }
+          }
+        )
+
+        setMessages(atMessages)
+      } catch (e) {
+        console.error('[hub] Airtable load failed', e)
+        // Silently fall back to empty — don't crash the page
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadMessages()
+  }, [])
+
+  // ── Gmail sync ─────────────────────────────────────────────────────────────
+  async function syncGmail() {
+    const tokens = storage.getGmailTokens()
+    if (!tokens) return
+
+    const userEmail = typeof window !== 'undefined'
+      ? (localStorage.getItem('at_token') ?? '')
+      : ''
+
+    setSyncing(true)
+    try {
+      const res = await fetch('/api/gmail/sync', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          accessToken:  tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          expiresAt:    tokens.expiresAt,
+          userEmail,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          storage.clearGmailTokens()
+          setGmailConnected(false)
+          toast.error('Session Gmail expirée — reconnectez Gmail dans la Configuration')
+        } else {
+          toast.error(data.error ?? 'Erreur synchronisation Gmail')
+        }
+        return
+      }
+
+      // Update tokens in localStorage if server refreshed them
+      if (data.newAccessToken) {
+        storage.setGmailTokens({
+          ...tokens,
+          accessToken: data.newAccessToken,
+          expiresAt:   data.newExpiresAt,
+        })
+      }
+
+      const gmailMessages: HubMessage[] = data.messages ?? []
+
+      // Merge: replace old gmail_* messages with fresh ones
+      setMessages(prev => {
+        const nonGmail = prev.filter(m => !m.id.startsWith('gmail_'))
+        return [...nonGmail, ...gmailMessages]
+      })
+
+      toast.success(`${gmailMessages.length} email${gmailMessages.length !== 1 ? 's' : ''} Gmail synchronisé${gmailMessages.length !== 1 ? 's' : ''}`)
+    } catch {
+      toast.error('Erreur réseau lors de la synchronisation Gmail')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  // ── Mark read ──────────────────────────────────────────────────────────────
+  function markRead(id: string) {
+    setMessages(prev => prev.map(m => m.id === id ? { ...m, read: true } : m))
+  }
 
   const filtered = messages
     .filter(m => filter === 'all' || m.source === filter)
@@ -43,12 +167,8 @@ export default function HubPage() {
       return ord[a.priority] - ord[b.priority] || b.date.localeCompare(a.date)
     })
 
-  function markRead(id: string) {
-    setMessages(prev => prev.map(m => m.id === id ? { ...m, read: true } : m))
-  }
-
-  const unreadCount  = messages.filter(m => !m.read).length
-  const urgentCount  = messages.filter(m => m.priority === 'high' && !m.read).length
+  const unreadCount = messages.filter(m => !m.read).length
+  const urgentCount = messages.filter(m => m.priority === 'high' && !m.read).length
 
   return (
     <AppLayout title="HUB" subtitle="Centralise tous tes messages importants">
@@ -57,9 +177,9 @@ export default function HubPage() {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: 'Non lus', value: unreadCount, color: '#A78BFA', bg: 'rgba(167,139,250,0.1)', icon: MessageSquare },
-            { label: 'Urgents', value: urgentCount, color: '#F87171', bg: 'rgba(248,113,113,0.1)', icon: AlertCircle },
-            { label: 'Total',   value: messages.length, color: 'rgba(255,255,255,0.5)', bg: 'rgba(255,255,255,0.04)', icon: Clock },
+            { label: 'Non lus', value: unreadCount,      color: '#A78BFA', bg: 'rgba(167,139,250,0.1)', icon: MessageSquare },
+            { label: 'Urgents', value: urgentCount,      color: '#F87171', bg: 'rgba(248,113,113,0.1)', icon: AlertCircle },
+            { label: 'Total',   value: messages.length,  color: 'rgba(255,255,255,0.5)', bg: 'rgba(255,255,255,0.04)', icon: Clock },
           ].map(s => (
             <div key={s.label} className="rounded-2xl p-4 flex items-center gap-3"
               style={{ background: s.bg, border: `1px solid ${s.color}22` }}>
@@ -72,7 +192,7 @@ export default function HubPage() {
           ))}
         </div>
 
-        {/* Filters */}
+        {/* Filters + Gmail sync */}
         <div className="flex items-center gap-2 flex-wrap">
           {(['all', 'circle', 'slack', 'whatsapp', 'email'] as const).map(src => (
             <button
@@ -88,6 +208,26 @@ export default function HubPage() {
               {src === 'all' ? 'Tous' : SOURCE_CONFIG[src].label}
             </button>
           ))}
+
+          {/* Gmail sync button — only shown when connected */}
+          {gmailConnected && (
+            <button
+              onClick={syncGmail}
+              disabled={syncing}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all"
+              style={{
+                background: 'rgba(252,211,77,0.08)',
+                border:     '1px solid rgba(252,211,77,0.2)',
+                color:      syncing ? 'rgba(255,255,255,0.3)' : '#FCD34D',
+              }}
+            >
+              {syncing
+                ? <><Loader2 className="w-3 h-3 animate-spin" /> Sync...</>
+                : <><Mail className="w-3 h-3" /> Sync Gmail</>
+              }
+            </button>
+          )}
+
           <button
             onClick={() => setShowUnread(p => !p)}
             className="ml-auto px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all"
@@ -102,8 +242,13 @@ export default function HubPage() {
         </div>
 
         {/* Messages */}
-        {filtered.length === 0 ? (
-          <EmptyState icon={MessageSquare} title="Aucun message" description="Connecte tes outils pour voir tes messages ici" />
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-6 h-6 animate-spin text-violet-400" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <EmptyState icon={MessageSquare} title="Aucun message"
+            description="Connecte tes outils pour voir tes messages ici" />
         ) : (
           <div className="space-y-2">
             {filtered.map(msg => {
@@ -152,17 +297,29 @@ export default function HubPage() {
           </div>
         )}
 
-        {/* Coming soon */}
-        <div className="rounded-2xl p-4 flex items-start gap-3"
-          style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.15)' }}>
-          <Slack className="w-4 h-4 mt-0.5 flex-shrink-0 text-violet-400" />
-          <div>
-            <p className="text-xs font-semibold text-violet-300 mb-0.5">Connexions à venir</p>
-            <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
-              Connecte Circle, Slack, WhatsApp et email via webhook Make pour centraliser tous tes messages automatiquement.
-            </p>
+        {/* Connect Gmail CTA — only shown when not connected */}
+        {!gmailConnected && (
+          <div className="rounded-2xl p-4 flex items-start gap-3"
+            style={{ background: 'rgba(252,211,77,0.06)', border: '1px solid rgba(252,211,77,0.12)' }}>
+            <Mail className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#FCD34D' }} />
+            <div className="flex-1">
+              <p className="text-xs font-semibold mb-0.5" style={{ color: '#FCD34D' }}>Connecte Gmail</p>
+              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                Synchronise tes emails non lus directement dans le Hub.
+                Configure la connexion dans{' '}
+                <a href="/configuration" className="underline" style={{ color: '#FCD34D' }}>Configuration</a>.
+              </p>
+            </div>
+            <button
+              onClick={() => { window.location.href = '/api/auth/gmail' }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold flex-shrink-0"
+              style={{ background: 'rgba(252,211,77,0.15)', color: '#FCD34D', border: '1px solid rgba(252,211,77,0.25)' }}
+            >
+              <RefreshCw className="w-3 h-3" /> Connecter
+            </button>
           </div>
-        </div>
+        )}
+
       </div>
     </AppLayout>
   )

@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { CheckCircle, XCircle, Eye, EyeOff, Settings, Shield } from 'lucide-react'
+import { CheckCircle, XCircle, Eye, EyeOff, Settings, Shield, Mail } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
@@ -11,6 +12,9 @@ import { storage } from '@/lib/storage'
 
 export default function ConfigurationPage() {
   const { config, setConfig, profil, setProfil } = useAppStore()
+  const searchParams = useSearchParams()
+  const router       = useRouter()
+
   const [atStatus, setAtStatus]     = useState<'idle' | 'ok' | 'error'>('idle')
   const [atTesting, setAtTesting]   = useState(false)
   const [showTokens, setShowTokens] = useState(false)
@@ -21,12 +25,50 @@ export default function ConfigurationPage() {
   const [ghToken,   setGhToken]   = useState('')
   const [atToken,   setAtToken]   = useState('')
 
+  const [gmailConnected, setGmailConnected] = useState(false)
+
   useEffect(() => {
     setAtToken(storage.getToken())
     setWebhook(config.webhook   ?? '')
     setClaudeKey(config.claudeKey ?? '')
     setGhToken(config.ghToken   ?? '')
-  }, [])
+
+    // ── Handle Gmail OAuth callback params ───────────────────────────────────
+    const gmailSuccess = searchParams.get('gmail_success')
+    const gmailError   = searchParams.get('gmail_error')
+    const at  = searchParams.get('at')
+    const rt  = searchParams.get('rt')
+    const exp = searchParams.get('exp')
+
+    if (gmailSuccess === '1' && at) {
+      const existing = storage.getGmailTokens()
+      storage.setGmailTokens({
+        accessToken:  at,
+        // Preserve existing refresh token if Google didn't return a new one
+        refreshToken: rt || existing?.refreshToken || '',
+        expiresAt:    Number(exp) || Date.now() + 3_600_000,
+      })
+      setGmailConnected(true)
+      toast.success('Gmail connecté avec succès !')
+      router.replace('/configuration')  // Remove OAuth params from URL
+    }
+
+    if (gmailError) {
+      const errorMessages: Record<string, string> = {
+        access_denied: 'Accès Gmail refusé',
+        missing_code:  'Erreur lors de la connexion Gmail',
+        token_exchange:"Échec de l'échange de token Gmail",
+        server_config: 'Configuration serveur Gmail manquante — vérifiez les variables d\'environnement',
+        server_error:  'Erreur serveur Gmail',
+      }
+      toast.error(errorMessages[gmailError] ?? 'Erreur Gmail inconnue')
+      router.replace('/configuration')
+    }
+
+    // Check if already connected
+    const tokens = storage.getGmailTokens()
+    if (tokens?.refreshToken) setGmailConnected(true)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function testAirtable() {
     if (!atToken) { toast.error('Token Airtable requis'); return }
@@ -121,6 +163,42 @@ export default function ConfigurationPage() {
             Les PDFs seront stockés sur <code className="px-1 py-0.5 rounded text-xs"
               style={{ background: 'rgba(255,255,255,0.08)' }}>bouryludovic-lab/LudoPilotage2/factures/</code>
           </p>
+        </Section>
+
+        {/* Gmail OAuth */}
+        <Section icon={Mail} title="Gmail" description="Synchronise tes emails non lus dans le Hub">
+          {gmailConnected ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-xl"
+                style={{ background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.2)', color: '#4ADE80' }}>
+                <CheckCircle className="w-3.5 h-3.5" /> Gmail connecté — accès lecture seule actif
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  storage.clearGmailTokens()
+                  setGmailConnected(false)
+                  toast.success('Gmail déconnecté')
+                }}
+              >
+                Déconnecter Gmail
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => { window.location.href = '/api/auth/gmail' }}
+              >
+                <Mail className="w-3.5 h-3.5 mr-1.5" /> Connecter Gmail
+              </Button>
+              <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                Accès en lecture seule. Tes emails non lus apparaîtront dans le Hub après synchronisation.
+              </p>
+            </div>
+          )}
         </Section>
 
         {/* Actions */}

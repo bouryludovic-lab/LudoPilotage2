@@ -1,5 +1,13 @@
 import type { Client, Config, CoachingConfig, Invoice, InvoiceTemplate, Profil } from './types'
 
+// ─── Gmail OAuth token bundle ─────────────────────────────────────────────────
+
+export interface GmailTokens {
+  accessToken:  string
+  refreshToken: string
+  expiresAt:    number  // Unix ms — Date.now() + expires_in * 1000
+}
+
 // ─── Safe localStorage / sessionStorage wrappers ─────────────────────────────
 
 function get<T>(key: string, fallback: T): T {
@@ -116,4 +124,9 @@ export const storage = {
     programContent: '',
   }),
   setCoachingConfig: (v: CoachingConfig) => set('coaching_config', v),
+
+  // ── Gmail OAuth ────────────────────────────────────────────────────────────
+  getGmailTokens: (): GmailTokens | null => get<GmailTokens | null>('gmail_tokens', null),
+  setGmailTokens: (tokens: GmailTokens): void => set('gmail_tokens', tokens),
+  clearGmailTokens: (): void => remove('gmail_tokens'),
 }
