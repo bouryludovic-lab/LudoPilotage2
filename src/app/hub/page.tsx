@@ -6,11 +6,12 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import {
   MessageSquare, Filter, CheckCheck, AlertCircle, Clock,
   Loader2, Mail, RefreshCw, X, Reply, Send, Pencil, Paperclip,
+  Settings, Sparkles, ChevronDown,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { EmptyState } from '@/components/ui/EmptyState'
-import type { HubMessage, HubSource, HubPriority } from '@/lib/types'
-import { AT_TABLES, AT_FIELDS } from '@/lib/types'
+import type { HubMessage, HubSource, HubPriority, MessageCategory, TriageResult, TriageConfig } from '@/lib/types'
+import { AT_TABLES, AT_FIELDS, DEFAULT_TRIAGE_CONFIG } from '@/lib/types'
 import { formatDate } from '@/lib/utils'
 import { storage } from '@/lib/storage'
 
@@ -29,6 +30,26 @@ const PRIORITY_CONFIG: Record<HubPriority, { label: string; variant: 'red' | 'am
   medium: { label: 'Moyen',  variant: 'amber' },
   low:    { label: 'Faible', variant: 'slate' },
 }
+
+const CATEGORY_CONFIG: Record<MessageCategory, { label: string; color: string; bg: string }> = {
+  perso:       { label: 'Perso',        color: '#C084FC', bg: 'rgba(192,132,252,0.1)' },
+  pro_admin:   { label: 'Pro · Admin',  color: '#60A5FA', bg: 'rgba(96,165,250,0.1)'  },
+  pro_outils:  { label: 'Pro · Outils', color: '#38BDF8', bg: 'rgba(56,189,248,0.1)'  },
+  pro_promos:  { label: 'Pro · Promos', color: '#FB923C', bg: 'rgba(251,146,60,0.1)'  },
+  pubs:        { label: 'Pubs',         color: '#94A3B8', bg: 'rgba(148,163,184,0.1)' },
+  newsletters: { label: 'Newsletter',   color: '#4ADE80', bg: 'rgba(74,222,128,0.1)'  },
+  spam:        { label: 'Spam',         color: '#F87171', bg: 'rgba(248,113,113,0.1)' },
+}
+
+const CAT_FILTERS = [
+  { id: 'all',         label: 'Toutes' },
+  { id: 'perso',       label: 'Perso' },
+  { id: 'pro',         label: 'Pro' },
+  { id: 'pubs',        label: 'Pubs' },
+  { id: 'newsletters', label: 'Newsletters' },
+  { id: 'spam',        label: 'Spam' },
+] as const
+type CatFilter = typeof CAT_FILTERS[number]['id']
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -59,6 +80,19 @@ function getUserEmail() {
   return typeof window !== 'undefined' ? (localStorage.getItem('at_token') ?? '') : ''
 }
 
+function getEffectivePriority(msg: HubMessage, results: Record<string, TriageResult>): HubPriority {
+  const base = results[msg.id]?.priority ?? msg.priority
+  if (base === 'medium' && !msg.read) {
+    const days = (Date.now() - new Date(msg.date).getTime()) / 86_400_000
+    if (days >= 4) return 'high'
+  }
+  return base
+}
+
+function getMsgCategory(msg: HubMessage, results: Record<string, TriageResult>): MessageCategory | undefined {
+  return results[msg.id]?.category ?? msg.category
+}
+
 function readFilesAsBase64(
   files: FileList | null,
   setter: React.Dispatch<React.SetStateAction<AttachmentItem[]>>
@@ -86,11 +120,19 @@ function readFilesAsBase64(
 export default function HubPage() {
   // List state
   const [filter, setFilter]         = useState<HubSource | 'all'>('all')
+  const [catFilter, setCatFilter]   = useState<CatFilter>('all')
   const [showUnread, setShowUnread] = useState(false)
   const [messages, setMessages]     = useState<HubMessage[]>([])
   const [loading, setLoading]       = useState(true)
   const [syncing, setSyncing]       = useState(false)
   const [gmailConnected, setGmailConnected] = useState(false)
+
+  // Triage state
+  const [triageResults,    setTriageResults]    = useState<Record<string, TriageResult>>({})
+  const [triageConfig,     setTriageConfigState] = useState<TriageConfig>(DEFAULT_TRIAGE_CONFIG)
+  const [triaging,         setTriaging]         = useState(false)
+  const [showTriageConfig, setShowTriageConfig] = useState(false)
+  const [editingConfig,    setEditingConfig]    = useState<TriageConfig>(DEFAULT_TRIAGE_CONFIG)
 
   // Detail panel state
   const [selectedMsg,   setSelectedMsg]   = useState<HubMessage | null>(null)
@@ -118,6 +160,12 @@ export default function HubPage() {
     const userEmail = getUserEmail()
     const tokens = storage.getGmailTokens()
     if (tokens?.refreshToken) setGmailConnected(true)
+
+    const storedResults = storage.getTriageResults()
+    setTriageResults(storedResults)
+    const storedConfig = storage.getTriageConfig()
+    setTriageConfigState(storedConfig)
+    setEditingConfig(storedConfig)
 
     async function loadMessages() {
       try {
@@ -164,6 +212,53 @@ export default function HubPage() {
     loadMessages()
   }, [])
 
+  // ── AI triage ────────────────────────────────────────────────────────────
+  async function runTriage(msgs: HubMessage[], config: TriageConfig) {
+    const toTriage = msgs.filter(m => m.id.startsWith('gmail_'))
+    if (!toTriage.length) return
+    setTriaging(true)
+    try {
+      const res = await fetch('/api/gmail/triage', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          messages: toTriage.map(m => ({
+            id:          m.id,
+            from:        m.author,
+            subject:     m.content,
+            date:        m.date,
+            isImportant: m.priority === 'high',
+          })),
+          config,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok && data.results?.length) {
+        setTriageResults(prev => {
+          const updated = { ...prev }
+          for (const r of data.results) {
+            updated[r.id] = { category: r.category, priority: r.priority, classifiedAt: new Date().toISOString() }
+          }
+          storage.setTriageResults(updated)
+          return updated
+        })
+        toast.success(`${data.results.length} email${data.results.length !== 1 ? 's' : ''} classé${data.results.length !== 1 ? 's' : ''} par IA`)
+      }
+    } catch {
+      toast.error('Erreur lors du triage IA')
+    } finally {
+      setTriaging(false)
+    }
+  }
+
+  // ── Save triage config ────────────────────────────────────────────────────
+  function saveTriageConfig() {
+    storage.setTriageConfig(editingConfig)
+    setTriageConfigState(editingConfig)
+    setShowTriageConfig(false)
+    toast.success('Configuration sauvegardée')
+  }
+
   // ── Gmail sync ───────────────────────────────────────────────────────────
   async function syncGmail() {
     const tokens = getTokens()
@@ -201,6 +296,7 @@ export default function HubPage() {
       const gmailMessages: HubMessage[] = data.messages ?? []
       setMessages(prev => [...prev.filter(m => !m.id.startsWith('gmail_')), ...gmailMessages])
       toast.success(`${gmailMessages.length} email${gmailMessages.length !== 1 ? 's' : ''} synchronisé${gmailMessages.length !== 1 ? 's' : ''}`)
+      if (gmailMessages.length > 0) runTriage(gmailMessages, triageConfig)
     } catch {
       toast.error('Erreur réseau lors de la synchronisation Gmail')
     } finally {
@@ -351,14 +447,22 @@ export default function HubPage() {
 
   const filtered = messages
     .filter(m => filter === 'all' || m.source === filter)
+    .filter(m => {
+      if (catFilter === 'all') return true
+      const cat = getMsgCategory(m, triageResults)
+      if (!cat) return false
+      if (catFilter === 'pro') return cat.startsWith('pro_')
+      return cat === catFilter
+    })
     .filter(m => !showUnread || !m.read)
     .sort((a, b) => {
       const ord: Record<HubPriority, number> = { high: 0, medium: 1, low: 2 }
-      return ord[a.priority] - ord[b.priority] || b.date.localeCompare(a.date)
+      return ord[getEffectivePriority(a, triageResults)] - ord[getEffectivePriority(b, triageResults)]
+        || b.date.localeCompare(a.date)
     })
 
   const unreadCount = messages.filter(m => !m.read).length
-  const urgentCount = messages.filter(m => m.priority === 'high' && !m.read).length
+  const urgentCount = messages.filter(m => getEffectivePriority(m, triageResults) === 'high' && !m.read).length
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -424,6 +528,96 @@ export default function HubPage() {
           </button>
         </div>
 
+        {/* Category filters + triage controls */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {CAT_FILTERS.map(f => (
+            <button key={f.id} onClick={() => setCatFilter(f.id)}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+              style={{
+                background: catFilter === f.id ? 'rgba(251,146,60,0.15)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${catFilter === f.id ? 'rgba(251,146,60,0.35)' : 'rgba(255,255,255,0.07)'}`,
+                color: catFilter === f.id ? '#FB923C' : 'rgba(255,255,255,0.4)',
+              }}>
+              {f.label}
+            </button>
+          ))}
+          <div className="ml-auto flex items-center gap-1.5">
+            {triaging && (
+              <span className="flex items-center gap-1 text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                <Loader2 className="w-3 h-3 animate-spin" /> Triage...
+              </span>
+            )}
+            {gmailConnected && (
+              <button
+                onClick={() => runTriage(messages.filter(m => m.id.startsWith('gmail_')), triageConfig)}
+                disabled={triaging}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all"
+                style={{
+                  background: triaging ? 'rgba(255,255,255,0.03)' : 'rgba(139,92,246,0.12)',
+                  border: '1px solid rgba(139,92,246,0.2)',
+                  color: triaging ? 'rgba(255,255,255,0.25)' : '#8B5CF6',
+                }}>
+                <Sparkles className="w-3 h-3" /> Trier par IA
+              </button>
+            )}
+            <button onClick={() => setShowTriageConfig(p => !p)}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs transition-all"
+              style={{
+                background: showTriageConfig ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: 'rgba(255,255,255,0.4)',
+              }}>
+              <Settings className="w-3 h-3" />
+              <ChevronDown className="w-3 h-3" style={{ transform: showTriageConfig ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+            </button>
+          </div>
+        </div>
+
+        {/* Triage config panel */}
+        {showTriageConfig && (
+          <div className="rounded-2xl p-4 space-y-3"
+            style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)' }}>
+            <p className="text-xs font-semibold" style={{ color: '#8B5CF6' }}>
+              Configuration du triage IA — Décris chaque catégorie pour affiner la classification
+            </p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {(Object.keys(editingConfig) as Array<keyof TriageConfig>).map(key => (
+                <div key={key}>
+                  <label className="block text-xs mb-1" style={{ color: CATEGORY_CONFIG[key as MessageCategory].color }}>
+                    {CATEGORY_CONFIG[key as MessageCategory].label}
+                  </label>
+                  <textarea
+                    value={editingConfig[key]}
+                    onChange={e => setEditingConfig(prev => ({ ...prev, [key]: e.target.value }))}
+                    rows={2}
+                    className="w-full text-xs px-2.5 py-2 rounded-xl resize-none outline-none"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)' }}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <button onClick={saveTriageConfig}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold"
+                style={{ background: 'rgba(139,92,246,0.2)', color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.3)' }}>
+                Sauvegarder
+              </button>
+              <button
+                onClick={() => { runTriage(messages.filter(m => m.id.startsWith('gmail_')), editingConfig) }}
+                disabled={triaging}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold"
+                style={{ background: 'rgba(251,146,60,0.12)', color: '#FB923C', border: '1px solid rgba(251,146,60,0.2)' }}>
+                <Sparkles className="w-3 h-3" /> Re-trier
+              </button>
+              <button onClick={() => setShowTriageConfig(false)}
+                className="text-xs px-2 py-1.5 rounded-xl"
+                style={{ color: 'rgba(255,255,255,0.3)' }}>
+                Fermer
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Message list */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -435,8 +629,11 @@ export default function HubPage() {
         ) : (
           <div className="space-y-2">
             {filtered.map(msg => {
-              const src = SOURCE_CONFIG[msg.source]
-              const pri = PRIORITY_CONFIG[msg.priority]
+              const src      = SOURCE_CONFIG[msg.source]
+              const effPri   = getEffectivePriority(msg, triageResults)
+              const pri      = PRIORITY_CONFIG[effPri]
+              const cat      = getMsgCategory(msg, triageResults)
+              const catCfg   = cat ? CATEGORY_CONFIG[cat] : null
               const isSelected = selectedMsg?.id === msg.id
               return (
                 <div key={msg.id} onClick={() => openMessage(msg)}
@@ -458,6 +655,12 @@ export default function HubPage() {
                         <span className="text-xs font-semibold text-white/70">{msg.author}</span>
                         <span className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{formatDate(msg.date)}</span>
                         <Badge variant={pri.variant} dot>{pri.label}</Badge>
+                        {catCfg && (
+                          <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold"
+                            style={{ background: catCfg.bg, color: catCfg.color, border: `1px solid ${catCfg.color}33` }}>
+                            {catCfg.label}
+                          </span>
+                        )}
                         {msg.actionRequired && <Badge variant="violet" dot>Action requise</Badge>}
                         {!msg.read && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#A78BFA' }} />}
                       </div>
