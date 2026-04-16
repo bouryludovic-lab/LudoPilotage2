@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type { HubMessage, HubPriority } from '@/lib/types'
 
+export const maxDuration = 30
+
 // ── Token refresh ─────────────────────────────────────────────────────────────
 
 async function refreshAccessToken(
@@ -88,7 +90,7 @@ export async function POST(req: NextRequest) {
 
     // ── Fetch message list ────────────────────────────────────────────────────
     const listRes = await fetch(
-      'https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&q=is:unread',
+      'https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50&q=in:inbox',
       { headers: authHeader }
     )
 
@@ -118,7 +120,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Fetch message details in parallel ─────────────────────────────────────
-    const detailPromises = messageIds.slice(0, 20).map(id =>
+    const detailPromises = messageIds.slice(0, 50).map(id =>
       fetch(
         `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}` +
         `?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,

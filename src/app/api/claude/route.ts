@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+export const maxDuration = 60
+
 /**
  * Server-side Claude API proxy.
  * Reads ANTHROPIC_API_KEY from env — never exposed to browser.
@@ -27,15 +29,23 @@ export async function POST(req: NextRequest) {
     if (systemPrompt) body.system = systemPrompt
     if (tools?.length)  body.tools  = tools
 
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key':         apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type':      'application/json',
-      },
-      body: JSON.stringify(body),
-    })
+    const ctrl  = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 55_000)
+    let r: Response
+    try {
+      r = await fetch('https://api.anthropic.com/v1/messages', {
+        method:  'POST',
+        signal:  ctrl.signal,
+        headers: {
+          'x-api-key':         apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type':      'application/json',
+        },
+        body: JSON.stringify(body),
+      })
+    } finally {
+      clearTimeout(timer)
+    }
 
     const data = await r.json()
     if (!r.ok) {

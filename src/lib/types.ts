@@ -98,8 +98,16 @@ export interface Config {
 
 // ─── New SaaS Models ─────────────────────────────────────────────────────────
 
-export type HubSource = 'circle' | 'slack' | 'whatsapp' | 'email' | 'notion'
+export type HubSource   = 'circle' | 'slack' | 'whatsapp' | 'email' | 'notion'
 export type HubPriority = 'high' | 'medium' | 'low'
+export type MessageCategory =
+  | 'perso'
+  | 'pro_admin'
+  | 'pro_outils'
+  | 'pro_promos'
+  | 'pubs'
+  | 'newsletters'
+  | 'spam'
 
 export interface HubMessage {
   id: string
@@ -112,6 +120,35 @@ export interface HubMessage {
   tags: string[]
   actionRequired?: boolean
   userEmail?: string
+  category?: MessageCategory
+}
+
+// ─── Triage (AI email classification) ────────────────────────────────────────
+
+export interface TriageResult {
+  category:     MessageCategory
+  priority:     HubPriority
+  classifiedAt: string
+}
+
+export interface TriageConfig {
+  perso:       string
+  pro_admin:   string
+  pro_outils:  string
+  pro_promos:  string
+  pubs:        string
+  newsletters: string
+  spam:        string
+}
+
+export const DEFAULT_TRIAGE_CONFIG: TriageConfig = {
+  perso:       'Emails de famille, amis et contacts personnels',
+  pro_admin:   'Administratif professionnel : factures, contrats, documents légaux, RH',
+  pro_outils:  'Notifications d\'outils (GitHub, Slack, Vercel, Stripe, Notion, etc.)',
+  pro_promos:  'Promotions et offres de services professionnels',
+  pubs:        'Publicités et emails commerciaux non sollicités',
+  newsletters: 'Newsletters, abonnements, digests, contenus éditoriaux',
+  spam:        'Spam, phishing, emails indésirables ou suspects',
 }
 
 export interface AIAgent {

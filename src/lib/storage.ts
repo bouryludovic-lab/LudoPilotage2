@@ -1,4 +1,5 @@
-import type { Client, Config, CoachingConfig, Invoice, InvoiceTemplate, Profil } from './types'
+import type { Client, Config, CoachingConfig, Invoice, InvoiceTemplate, Profil, TriageConfig, TriageResult } from './types'
+import { DEFAULT_TRIAGE_CONFIG } from './types'
 
 // ─── Gmail OAuth token bundle ─────────────────────────────────────────────────
 
@@ -129,4 +130,10 @@ export const storage = {
   getGmailTokens: (): GmailTokens | null => get<GmailTokens | null>('gmail_tokens', null),
   setGmailTokens: (tokens: GmailTokens): void => set('gmail_tokens', tokens),
   clearGmailTokens: (): void => remove('gmail_tokens'),
+
+  // ── AI Triage ──────────────────────────────────────────────────────────────
+  getTriageConfig: (): TriageConfig => get<TriageConfig>('triage_config', DEFAULT_TRIAGE_CONFIG),
+  setTriageConfig: (v: TriageConfig): void => set('triage_config', v),
+  getTriageResults: (): Record<string, TriageResult> => get<Record<string, TriageResult>>('triage_results', {}),
+  setTriageResults: (v: Record<string, TriageResult>): void => set('triage_results', v),
 }
