@@ -131,7 +131,7 @@ export default function FormulairesPage() {
                 style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div className="flex items-start gap-3 mb-3">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.2)' }}>
+                    style={{ background: 'rgba(59,107,232,0.1)', border: '1px solid rgba(59,107,232,0.15)' }}>
                     <FileText className="w-4.5 h-4.5 text-violet-400" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -169,7 +169,7 @@ export default function FormulairesPage() {
 
         {/* Coming soon */}
         <div className="rounded-2xl p-4 flex items-start gap-3"
-          style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.15)' }}>
+          style={{ background: 'rgba(59,107,232,0.08)', border: '1px solid rgba(59,107,232,0.12)' }}>
           <Zap className="w-4 h-4 mt-0.5 flex-shrink-0 text-violet-400" />
           <div>
             <p className="text-xs font-semibold text-violet-300 mb-0.5">Génération PDF automatique</p>

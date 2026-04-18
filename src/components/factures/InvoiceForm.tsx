@@ -159,7 +159,7 @@ export function InvoiceForm() {
 
           {selectedClient ? (
             <div className="rounded-xl p-3 text-xs self-end"
-              style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.15)' }}>
+              style={{ background: 'rgba(59,107,232,0.08)', border: '1px solid rgba(59,107,232,0.12)' }}>
               <div className="font-semibold mb-0.5 text-violet-300">{selectedClient.nom}</div>
               {selectedClient.email   && <div style={{ color: 'rgba(255,255,255,0.5)' }}>{selectedClient.email}</div>}
               {selectedClient.adresse && <div className="truncate" style={{ color: 'rgba(255,255,255,0.4)' }}>{selectedClient.adresse}</div>}
@@ -276,7 +276,7 @@ export function InvoiceForm() {
             onClick={() => setLines(prev => [...prev, emptyLine()])}
             className="w-full py-2.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-1.5 mt-2"
             style={{ border: '1px dashed rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.35)' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(124,58,237,0.4)'; (e.currentTarget as HTMLButtonElement).style.color = '#A78BFA' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(59,107,232,0.3)'; (e.currentTarget as HTMLButtonElement).style.color = '#7AAAFF' }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.12)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.35)' }}
           >
             <Plus className="w-3.5 h-3.5" /> Ajouter une ligne
@@ -285,7 +285,7 @@ export function InvoiceForm() {
 
         {/* Total */}
         <div className="mt-4 rounded-xl p-3.5 space-y-1.5"
-          style={{ background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.12)' }}>
+          style={{ background: 'rgba(59,107,232,0.06)', border: '1px solid rgba(59,107,232,0.1)' }}>
           <div className="flex justify-between text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>
             <span>Sous-total HT</span>
             <span className="font-medium tabular-nums">{formatEur(subtotal)}</span>

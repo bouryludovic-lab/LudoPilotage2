@@ -103,7 +103,7 @@ export default function LoginPage() {
   const DIGITS = ['1','2','3','4','5','6','7','8','9','','0','⌫']
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#080B14' }}>
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#0C1628' }}>
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="orb orb-violet w-[600px] h-[600px] -top-48 -left-48 opacity-35" />
         <div className="orb orb-indigo w-[500px] h-[500px] -bottom-48 -right-48 opacity-25" />
@@ -117,8 +117,8 @@ export default function LoginPage() {
             onClick={handleLogoClick}
             className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
             style={{
-              background: 'linear-gradient(135deg, #7C3AED, #4F46E5)',
-              boxShadow: '0 0 40px rgba(124,58,237,0.4)',
+              background: 'linear-gradient(135deg, #3B6BE8, #2563EB)',
+              boxShadow: '0 0 40px rgba(59,107,232,0.3)',
               cursor: 'default',
             }}
           >
@@ -141,9 +141,9 @@ export default function LoginPage() {
               key={i}
               className="w-3.5 h-3.5 rounded-full transition-all duration-200"
               style={{
-                background: i < pin.length ? 'linear-gradient(135deg, #7C3AED, #4F46E5)' : 'rgba(255,255,255,0.12)',
+                background: i < pin.length ? 'linear-gradient(135deg, #3B6BE8, #2563EB)' : 'rgba(255,255,255,0.12)',
                 transform: i < pin.length ? 'scale(1.3)' : 'scale(1)',
-                boxShadow: i < pin.length ? '0 0 10px rgba(124,58,237,0.5)' : 'none',
+                boxShadow: i < pin.length ? '0 0 10px rgba(59,107,232,0.4)' : 'none',
               }}
             />
           ))}
@@ -180,7 +180,7 @@ export default function LoginPage() {
             onClick={() => setStay(p => !p)}
             className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-all"
             style={{
-              background: stayLoggedIn ? 'linear-gradient(135deg, #7C3AED, #4F46E5)' : 'rgba(255,255,255,0.06)',
+              background: stayLoggedIn ? 'linear-gradient(135deg, #3B6BE8, #2563EB)' : 'rgba(255,255,255,0.06)',
               border: stayLoggedIn ? 'none' : '1px solid rgba(255,255,255,0.18)',
             }}
           >
@@ -225,7 +225,7 @@ export default function LoginPage() {
             <button
               onClick={saveSetupToken}
               className="w-full py-2.5 rounded-xl text-sm font-semibold text-white"
-              style={{ background: 'linear-gradient(135deg, #7C3AED, #4F46E5)' }}
+              style={{ background: 'linear-gradient(135deg, #3B6BE8, #2563EB)' }}
             >
               Sauvegarder
             </button>

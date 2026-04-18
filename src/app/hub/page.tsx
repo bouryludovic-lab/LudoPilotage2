@@ -19,7 +19,7 @@ import { storage } from '@/lib/storage'
 
 const SOURCE_CONFIG: Record<HubSource, { label: string; color: string; bg: string }> = {
   circle:   { label: 'Circle',   color: '#60A5FA', bg: 'rgba(96,165,250,0.1)' },
-  slack:    { label: 'Slack',    color: '#A78BFA', bg: 'rgba(167,139,250,0.1)' },
+  slack:    { label: 'Slack',    color: '#7AAAFF', bg: 'rgba(122,170,255,0.1)' },
   whatsapp: { label: 'WhatsApp', color: '#4ADE80', bg: 'rgba(74,222,128,0.1)' },
   email:    { label: 'Email',    color: '#FCD34D', bg: 'rgba(252,211,77,0.1)' },
   notion:   { label: 'Notion',   color: 'rgba(255,255,255,0.5)', bg: 'rgba(255,255,255,0.06)' },
@@ -472,7 +472,7 @@ export default function HubPage() {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: 'Non lus', value: unreadCount,     color: '#A78BFA', bg: 'rgba(167,139,250,0.1)', icon: MessageSquare },
+            { label: 'Non lus', value: unreadCount,     color: '#7AAAFF', bg: 'rgba(122,170,255,0.1)', icon: MessageSquare },
             { label: 'Urgents', value: urgentCount,     color: '#F87171', bg: 'rgba(248,113,113,0.1)', icon: AlertCircle },
             { label: 'Total',   value: messages.length, color: 'rgba(255,255,255,0.5)', bg: 'rgba(255,255,255,0.04)', icon: Clock },
           ].map(s => (
@@ -493,9 +493,9 @@ export default function HubPage() {
             <button key={src} onClick={() => setFilter(src)}
               className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
               style={{
-                background: filter === src ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.05)',
-                border: `1px solid ${filter === src ? 'rgba(124,58,237,0.4)' : 'rgba(255,255,255,0.08)'}`,
-                color: filter === src ? '#A78BFA' : 'rgba(255,255,255,0.5)',
+                background: filter === src ? 'rgba(59,107,232,0.15)' : 'rgba(255,255,255,0.05)',
+                border: `1px solid ${filter === src ? 'rgba(59,107,232,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                color: filter === src ? '#7AAAFF' : 'rgba(255,255,255,0.5)',
               }}>
               {src === 'all' ? 'Tous' : SOURCE_CONFIG[src].label}
             </button>
@@ -511,7 +511,7 @@ export default function HubPage() {
               </button>
               <button onClick={() => setShowCompose(true)}
                 className="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5"
-                style={{ background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.2)', color: '#A78BFA' }}>
+                style={{ background: 'rgba(59,107,232,0.1)', border: '1px solid rgba(59,107,232,0.15)', color: '#7AAAFF' }}>
                 <Pencil className="w-3 h-3" /> Nouveau mail
               </button>
             </>
@@ -520,9 +520,9 @@ export default function HubPage() {
           <button onClick={() => setShowUnread(p => !p)}
             className="ml-auto px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all"
             style={{
-              background: showUnread ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.05)',
-              border: `1px solid ${showUnread ? 'rgba(124,58,237,0.4)' : 'rgba(255,255,255,0.08)'}`,
-              color: showUnread ? '#A78BFA' : 'rgba(255,255,255,0.5)',
+              background: showUnread ? 'rgba(59,107,232,0.15)' : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${showUnread ? 'rgba(59,107,232,0.3)' : 'rgba(255,255,255,0.08)'}`,
+              color: showUnread ? '#7AAAFF' : 'rgba(255,255,255,0.5)',
             }}>
             <Filter className="w-3 h-3" /> Non lus
           </button>
@@ -553,9 +553,9 @@ export default function HubPage() {
                 disabled={triaging}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all"
                 style={{
-                  background: triaging ? 'rgba(255,255,255,0.03)' : 'rgba(139,92,246,0.12)',
-                  border: '1px solid rgba(139,92,246,0.2)',
-                  color: triaging ? 'rgba(255,255,255,0.25)' : '#8B5CF6',
+                  background: triaging ? 'rgba(255,255,255,0.03)' : 'rgba(59,107,232,0.1)',
+                  border: '1px solid rgba(59,107,232,0.15)',
+                  color: triaging ? 'rgba(255,255,255,0.25)' : '#5090F0',
                 }}>
                 <Sparkles className="w-3 h-3" /> Trier par IA
               </button>
@@ -576,8 +576,8 @@ export default function HubPage() {
         {/* Triage config panel */}
         {showTriageConfig && (
           <div className="rounded-2xl p-4 space-y-3"
-            style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)' }}>
-            <p className="text-xs font-semibold" style={{ color: '#8B5CF6' }}>
+            style={{ background: 'rgba(59,107,232,0.06)', border: '1px solid rgba(59,107,232,0.12)' }}>
+            <p className="text-xs font-semibold" style={{ color: '#5090F0' }}>
               Configuration du triage IA — Décris chaque catégorie pour affiner la classification
             </p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -599,7 +599,7 @@ export default function HubPage() {
             <div className="flex items-center gap-2 pt-1">
               <button onClick={saveTriageConfig}
                 className="px-3 py-1.5 rounded-xl text-xs font-semibold"
-                style={{ background: 'rgba(139,92,246,0.2)', color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.3)' }}>
+                style={{ background: 'rgba(59,107,232,0.15)', color: '#5090F0', border: '1px solid rgba(59,107,232,0.22)' }}>
                 Sauvegarder
               </button>
               <button
@@ -640,9 +640,9 @@ export default function HubPage() {
                   className="rounded-2xl p-4 transition-all cursor-pointer"
                   style={{
                     background: isSelected
-                      ? 'rgba(124,58,237,0.12)'
+                      ? 'rgba(59,107,232,0.1)'
                       : msg.read ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.05)',
-                    border: `1px solid ${isSelected ? 'rgba(124,58,237,0.3)' : msg.read ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.09)'}`,
+                    border: `1px solid ${isSelected ? 'rgba(59,107,232,0.22)' : msg.read ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.09)'}`,
                   }}>
                   <div className="flex items-start gap-3">
                     <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
@@ -662,7 +662,7 @@ export default function HubPage() {
                           </span>
                         )}
                         {msg.actionRequired && <Badge variant="violet" dot>Action requise</Badge>}
-                        {!msg.read && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#A78BFA' }} />}
+                        {!msg.read && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#7AAAFF' }} />}
                       </div>
                       <p className="text-sm leading-relaxed truncate" style={{ color: 'rgba(255,255,255,0.65)' }}>
                         {msg.content}
@@ -714,11 +714,11 @@ export default function HubPage() {
 
           {/* Panel */}
           <div className="w-full max-w-lg h-full overflow-y-auto flex flex-col"
-            style={{ background: '#0e0c1a', borderLeft: '1px solid rgba(255,255,255,0.08)' }}>
+            style={{ background: '##0C1628', borderLeft: '1px solid rgba(255,255,255,0.08)' }}>
 
             {/* Header */}
             <div className="flex items-center gap-3 p-4 sticky top-0 z-10"
-              style={{ background: '#0e0c1a', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              style={{ background: '##0C1628', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-white truncate">{selectedMsg.author}</p>
                 <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>
@@ -774,11 +774,11 @@ export default function HubPage() {
             {/* Reply section — only for Gmail messages */}
             {selectedMsg.id.startsWith('gmail_') && (
               <div className="p-4 sticky bottom-0"
-                style={{ background: '#0e0c1a', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                style={{ background: '##0C1628', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                 {!showReply ? (
                   <button onClick={() => setShowReply(true)}
                     className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold"
-                    style={{ background: 'rgba(124,58,237,0.12)', color: '#A78BFA', border: '1px solid rgba(124,58,237,0.2)' }}>
+                    style={{ background: 'rgba(59,107,232,0.1)', color: '#7AAAFF', border: '1px solid rgba(59,107,232,0.15)' }}>
                     <Reply className="w-3.5 h-3.5" /> Répondre
                   </button>
                 ) : (
@@ -826,9 +826,9 @@ export default function HubPage() {
                         disabled={sending || !replyBody.trim()}
                         className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-semibold transition-all"
                         style={{
-                          background: sending || !replyBody.trim() ? 'rgba(124,58,237,0.06)' : 'rgba(124,58,237,0.2)',
-                          color: sending || !replyBody.trim() ? 'rgba(167,139,250,0.35)' : '#A78BFA',
-                          border: '1px solid rgba(124,58,237,0.25)',
+                          background: sending || !replyBody.trim() ? 'rgba(59,107,232,0.06)' : 'rgba(59,107,232,0.15)',
+                          color: sending || !replyBody.trim() ? 'rgba(122,170,255,0.28)' : '#7AAAFF',
+                          border: '1px solid rgba(59,107,232,0.18)',
                         }}>
                         {sending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
                         Envoyer
@@ -848,7 +848,7 @@ export default function HubPage() {
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setShowCompose(false)} />
           <div className="relative w-full max-w-lg rounded-2xl p-6 space-y-4"
-            style={{ background: '#0e0c1a', border: '1px solid rgba(255,255,255,0.1)' }}>
+            style={{ background: '##0C1628', border: '1px solid rgba(255,255,255,0.1)' }}>
 
             <div className="flex items-center justify-between mb-1">
               <h3 className="text-sm font-bold text-white">Nouveau mail</h3>
@@ -909,9 +909,9 @@ export default function HubPage() {
                 disabled={composeSending || !composeTo.trim() || !composeSubject.trim() || !composeBody.trim()}
                 className="flex items-center gap-1.5 text-xs px-4 py-2 rounded-xl font-semibold transition-all"
                 style={{
-                  background: composeSending ? 'rgba(124,58,237,0.06)' : 'rgba(124,58,237,0.2)',
-                  color: composeSending ? 'rgba(167,139,250,0.35)' : '#A78BFA',
-                  border: '1px solid rgba(124,58,237,0.3)',
+                  background: composeSending ? 'rgba(59,107,232,0.06)' : 'rgba(59,107,232,0.15)',
+                  color: composeSending ? 'rgba(122,170,255,0.28)' : '#7AAAFF',
+                  border: '1px solid rgba(59,107,232,0.22)',
                 }}>
                 {composeSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 Envoyer

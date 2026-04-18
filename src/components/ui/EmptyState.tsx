@@ -12,7 +12,7 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
   return (
     <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
       <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-        style={{ background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.2)' }}>
+        style={{ background: 'rgba(59,107,232,0.1)', border: '1px solid rgba(59,107,232,0.15)' }}>
         <Icon className="w-6 h-6 text-violet-400" />
       </div>
       <p className="text-sm font-semibold text-white/60 mb-1.5">{title}</p>

@@ -306,13 +306,13 @@ export default function FactureTypePage() {
               <button onClick={() => setLines(p => [...p, emptyLine()])}
                 className="w-full py-2.5 rounded-xl text-sm flex items-center justify-center gap-1.5 transition-colors"
                 style={{ border: '1px dashed rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.35)' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(124,58,237,0.4)'; (e.currentTarget as HTMLButtonElement).style.color = '#A78BFA' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(59,107,232,0.3)'; (e.currentTarget as HTMLButtonElement).style.color = '#7AAAFF' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.12)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.35)' }}>
                 <Plus className="w-3.5 h-3.5" /> Ajouter une ligne
               </button>
               {subtotal > 0 && (
                 <div className="rounded-xl p-3 flex justify-between"
-                  style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.15)' }}>
+                  style={{ background: 'rgba(59,107,232,0.08)', border: '1px solid rgba(59,107,232,0.12)' }}>
                   <span className="text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>Total modèle (HT)</span>
                   <span className="text-sm font-bold text-violet-300 tabular-nums">{formatEur(subtotal)}</span>
                 </div>
@@ -335,7 +335,7 @@ export default function FactureTypePage() {
         <div className="flex justify-end pb-8">
           <button onClick={handleSave} disabled={saving}
             className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-opacity"
-            style={{ background: 'linear-gradient(135deg, #7C3AED, #4F46E5)' }}>
+            style={{ background: 'linear-gradient(135deg, #3B6BE8, #2563EB)' }}>
             <Save className="w-4 h-4" />
             {saving ? 'Enregistrement…' : 'Enregistrer le modèle'}
           </button>

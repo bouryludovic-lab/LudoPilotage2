@@ -106,7 +106,7 @@ export default function ProfilPage() {
           <div className="flex items-center gap-4">
             {/* Avatar */}
             <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 text-xl font-bold text-white"
-              style={{ background: 'linear-gradient(135deg, #7C3AED, #4F46E5)' }}>
+              style={{ background: 'linear-gradient(135deg, #3B6BE8, #2563EB)' }}>
               {(profil.nom || '?').charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
@@ -128,7 +128,7 @@ export default function ProfilPage() {
               onClick={handleSwitchAccount}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all"
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(124,58,237,0.1)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(124,58,237,0.3)'; (e.currentTarget as HTMLButtonElement).style.color = '#A78BFA' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(59,107,232,0.1)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(59,107,232,0.22)'; (e.currentTarget as HTMLButtonElement).style.color = '#7AAAFF' }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.6)' }}
             >
               <RefreshCw className="w-3.5 h-3.5" />

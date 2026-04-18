@@ -129,7 +129,7 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#080B14' }}>
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#0C1628' }}>
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="orb orb-violet w-[600px] h-[600px] -top-48 -left-48 opacity-30" />
         <div className="orb orb-indigo w-[500px] h-[500px] -bottom-48 -right-48 opacity-20" />
@@ -140,7 +140,7 @@ export default function SignupPage() {
         {/* Header */}
         <div className="flex flex-col items-center mb-8">
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-            style={{ background: 'linear-gradient(135deg, #7C3AED, #4F46E5)', boxShadow: '0 0 32px rgba(124,58,237,0.35)' }}>
+            style={{ background: 'linear-gradient(135deg, #3B6BE8, #2563EB)', boxShadow: '0 0 32px rgba(59,107,232,0.28)' }}>
             <Zap className="w-7 h-7 text-white" strokeWidth={2.5} />
           </div>
           <h1 className="text-2xl font-bold text-white mb-1">Créer un compte</h1>
@@ -154,10 +154,10 @@ export default function SignupPage() {
             const active = step === s
             return (
               <div key={s} className="flex items-center gap-2">
-                {i > 0 && <div className="w-8 h-px" style={{ background: done ? '#7C3AED' : 'rgba(255,255,255,0.1)' }} />}
+                {i > 0 && <div className="w-8 h-px" style={{ background: done ? '#3B6BE8' : 'rgba(255,255,255,0.1)' }} />}
                 <div className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold transition-all"
                   style={{
-                    background: active ? 'linear-gradient(135deg,#7C3AED,#4F46E5)' : done ? 'rgba(124,58,237,0.3)' : 'rgba(255,255,255,0.06)',
+                    background: active ? 'linear-gradient(135deg,#3B6BE8,#2563EB)' : done ? 'rgba(59,107,232,0.22)' : 'rgba(255,255,255,0.06)',
                     color: active || done ? 'white' : 'rgba(255,255,255,0.3)',
                     border: active ? 'none' : '1px solid rgba(255,255,255,0.08)',
                   }}
@@ -180,7 +180,7 @@ export default function SignupPage() {
                 type="email" required placeholder="jean@exemple.fr" error={errors.email} />
               <button onClick={nextToCompany}
                 className="w-full py-3 rounded-xl text-sm font-semibold text-white mt-2"
-                style={{ background: 'linear-gradient(135deg, #7C3AED, #4F46E5)' }}>
+                style={{ background: 'linear-gradient(135deg, #3B6BE8, #2563EB)' }}>
                 Continuer
               </button>
             </>
@@ -209,7 +209,7 @@ export default function SignupPage() {
                 </button>
                 <button onClick={nextToPin}
                   className="flex-1 py-3 rounded-xl text-sm font-semibold text-white"
-                  style={{ background: 'linear-gradient(135deg, #7C3AED, #4F46E5)' }}>
+                  style={{ background: 'linear-gradient(135deg, #3B6BE8, #2563EB)' }}>
                   Continuer
                 </button>
               </div>
@@ -268,7 +268,7 @@ export default function SignupPage() {
                 </button>
                 <button onClick={handleSubmit} disabled={loading}
                   className="flex-1 py-3 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
-                  style={{ background: 'linear-gradient(135deg, #7C3AED, #4F46E5)' }}>
+                  style={{ background: 'linear-gradient(135deg, #3B6BE8, #2563EB)' }}>
                   {loading ? 'Création…' : 'Créer mon compte'}
                 </button>
               </div>

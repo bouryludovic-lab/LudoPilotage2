@@ -333,7 +333,7 @@ Question :
                 {configDirty && (
                   <button onClick={saveConfig}
                     className="w-full py-2 rounded-xl text-xs font-semibold text-white"
-                    style={{ background: 'linear-gradient(135deg,#7C3AED,#4F46E5)' }}>
+                    style={{ background: 'linear-gradient(135deg,#3B6BE8,#2563EB)' }}>
                     Sauvegarder
                   </button>
                 )}
@@ -363,8 +363,8 @@ Question :
               <button key={f} onClick={() => setFilter(f)}
                 className="px-2.5 py-1 rounded-lg text-xs font-medium transition-all"
                 style={{
-                  background: filter === f ? 'rgba(124,58,237,0.25)' : 'rgba(255,255,255,0.04)',
-                  border: `1px solid ${filter === f ? 'rgba(124,58,237,0.4)' : 'rgba(255,255,255,0.07)'}`,
+                  background: filter === f ? 'rgba(59,107,232,0.18)' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${filter === f ? 'rgba(59,107,232,0.3)' : 'rgba(255,255,255,0.07)'}`,
                   color: filter === f ? '#c4b5fd' : 'rgba(255,255,255,0.4)',
                 }}>
                 {f === 'all'   ? `Tous (${submissions.length})`
@@ -396,8 +396,8 @@ Question :
                 <button key={s.id} onClick={() => setSelected(s)}
                   className="w-full text-left rounded-2xl p-3.5 transition-all"
                   style={{
-                    background: selected?.id === s.id ? 'rgba(124,58,237,0.12)' : 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${selected?.id === s.id ? 'rgba(124,58,237,0.3)' : 'rgba(255,255,255,0.06)'}`,
+                    background: selected?.id === s.id ? 'rgba(59,107,232,0.1)' : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${selected?.id === s.id ? 'rgba(59,107,232,0.22)' : 'rgba(255,255,255,0.06)'}`,
                   }}>
                   <div className="flex items-center justify-between gap-2 mb-1.5">
                     <span className="text-sm font-semibold text-white/80 truncate">{s.studentName}</span>
@@ -424,7 +424,7 @@ Question :
           {!selected ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
               <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
-                style={{ background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.18)' }}>
+                style={{ background: 'rgba(59,107,232,0.1)', border: '1px solid rgba(124,58,237,0.18)' }}>
                 <GraduationCap className="w-7 h-7 text-violet-400" />
               </div>
               <div className="text-center max-w-sm">
@@ -502,7 +502,7 @@ Question :
                     <div className="flex items-center gap-2">
                       <button onClick={() => autoGenerate(selected)} disabled={generating}
                         className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
-                        style={{ background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.2)', color: '#c4b5fd' }}>
+                        style={{ background: 'rgba(59,107,232,0.1)', border: '1px solid rgba(59,107,232,0.15)', color: '#c4b5fd' }}>
                         {generating
                           ? <><Clock className="w-3 h-3 animate-spin" /> Génération…</>
                           : <><Sparkles className="w-3 h-3" /> Régénérer</>}
@@ -510,8 +510,8 @@ Question :
                       <button onClick={() => setShowChat(p => !p)}
                         className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors"
                         style={{
-                          background: showChat ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.05)',
-                          border: `1px solid ${showChat ? 'rgba(124,58,237,0.35)' : 'rgba(255,255,255,0.08)'}`,
+                          background: showChat ? 'rgba(59,107,232,0.15)' : 'rgba(255,255,255,0.05)',
+                          border: `1px solid ${showChat ? 'rgba(59,107,232,0.28)' : 'rgba(255,255,255,0.08)'}`,
                           color: showChat ? '#c4b5fd' : 'rgba(255,255,255,0.4)',
                         }}>
                         <Bot className="w-3 h-3" /> Questionner l'agent
@@ -534,7 +534,7 @@ Question :
                     {editedResponse !== selected.aiResponse && (
                       <button onClick={saveResponse} disabled={savingResponse}
                         className="px-3 py-2 rounded-xl text-xs font-semibold text-white disabled:opacity-50"
-                        style={{ background: 'rgba(124,58,237,0.3)', border: '1px solid rgba(124,58,237,0.4)' }}>
+                        style={{ background: 'rgba(59,107,232,0.22)', border: '1px solid rgba(59,107,232,0.3)' }}>
                         {savingResponse ? 'Sauvegarde…' : 'Sauvegarder'}
                       </button>
                     )}
@@ -547,7 +547,7 @@ Question :
                       </button>
                       <button onClick={copyResponse} disabled={!editedResponse}
                         className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-40"
-                        style={{ background: copied ? 'rgba(52,211,153,0.3)' : 'linear-gradient(135deg,#7C3AED,#4F46E5)', border: copied ? '1px solid rgba(52,211,153,0.4)' : 'none' }}>
+                        style={{ background: copied ? 'rgba(52,211,153,0.3)' : 'linear-gradient(135deg,#3B6BE8,#2563EB)', border: copied ? '1px solid rgba(52,211,153,0.4)' : 'none' }}>
                         {copied ? <><Check className="w-4 h-4" /> Copié !</> : <><Copy className="w-4 h-4" /> Copier la réponse</>}
                       </button>
                     </div>
@@ -557,9 +557,9 @@ Question :
                 {/* Agent chat */}
                 {showChat && (
                   <div className="rounded-2xl overflow-hidden"
-                    style={{ border: '1px solid rgba(124,58,237,0.2)', background: 'rgba(124,58,237,0.03)' }}>
+                    style={{ border: '1px solid rgba(59,107,232,0.15)', background: 'rgba(124,58,237,0.03)' }}>
                     <div className="px-4 py-2.5 flex items-center gap-2"
-                      style={{ borderBottom: '1px solid rgba(124,58,237,0.12)' }}>
+                      style={{ borderBottom: '1px solid rgba(59,107,232,0.1)' }}>
                       <Bot className="w-3.5 h-3.5 text-violet-400" />
                       <span className="text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.45)' }}>
                         Demande à l'agent de reformuler, ajuster, raccourcir…
@@ -575,7 +575,7 @@ Question :
                         <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                           <div className="max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed whitespace-pre-wrap"
                             style={m.role === 'user'
-                              ? { background: 'rgba(124,58,237,0.25)', color: 'white' }
+                              ? { background: 'rgba(59,107,232,0.18)', color: 'white' }
                               : { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)', border: '1px solid rgba(255,255,255,0.07)' }}>
                             {m.content}
                           </div>
@@ -592,7 +592,7 @@ Question :
                       )}
                       <div ref={chatBottomRef} />
                     </div>
-                    <div className="p-3 flex gap-2" style={{ borderTop: '1px solid rgba(124,58,237,0.1)' }}>
+                    <div className="p-3 flex gap-2" style={{ borderTop: '1px solid rgba(59,107,232,0.1)' }}>
                       <input
                         className="flex-1 rounded-xl px-3 py-2 text-xs"
                         style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.8)', outline: 'none' }}
@@ -604,7 +604,7 @@ Question :
                       />
                       <button onClick={sendChat} disabled={chatSending || !chatInput.trim()}
                         className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 disabled:opacity-40"
-                        style={{ background: 'linear-gradient(135deg,#7C3AED,#4F46E5)' }}>
+                        style={{ background: 'linear-gradient(135deg,#3B6BE8,#2563EB)' }}>
                         <Send className="w-3.5 h-3.5 text-white" />
                       </button>
                     </div>

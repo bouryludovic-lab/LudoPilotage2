@@ -44,24 +44,30 @@ export function Sidebar() {
   return (
     <aside
       className="fixed left-0 top-0 h-screen w-[220px] flex flex-col z-30 select-none"
-      style={{ background: '#111E35', borderRight: '1px solid rgba(255,255,255,0.04)' }}
+      style={{ background: '#0C1628', borderRight: '1px solid rgba(255,255,255,0.06)' }}
     >
       {/* Logo */}
-      <div className="px-4 py-5 flex items-center gap-3">
-        <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 font-bold text-white text-[11px] tracking-tight"
-          style={{ background: 'linear-gradient(135deg, #3B6BE8, #2563EB)', letterSpacing: '-0.02em' }}
-        >
-          TNS
+      <div className="px-5 py-6">
+        <div className="flex items-center gap-3 mb-1">
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-[10px] font-black text-white tracking-tight"
+            style={{ background: '#3B6BE8', border: '1px solid rgba(255,255,255,0.12)' }}
+          >
+            TNS
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-white leading-tight tracking-[0.08em] uppercase">The Next Step</p>
+            <p className="text-[9px] leading-tight tracking-[0.12em] uppercase mt-0.5" style={{ color: 'rgba(255,255,255,0.28)' }}>
+              Consulting & Strategy
+            </p>
+          </div>
         </div>
-        <div className="min-w-0">
-          <p className="text-[12px] font-bold text-white leading-none truncate tracking-wide">THE NEXT STEP</p>
-          <p className="text-[9px] mt-1 leading-none font-medium tracking-widest uppercase" style={{ color: 'rgba(122,170,255,0.55)' }}>Consulting & Strategy</p>
-        </div>
+        {/* Blue accent line like the logo */}
+        <div className="mt-4 h-px" style={{ background: 'linear-gradient(90deg, #3B6BE8, transparent)' }} />
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 overflow-y-auto space-y-0.5 pb-2">
+      <nav className="flex-1 px-3 overflow-y-auto pb-2 space-y-0.5">
         <SectionLabel>Principal</SectionLabel>
         {mainItems.map(item => (
           <NavItem
@@ -72,7 +78,7 @@ export function Sidebar() {
           />
         ))}
 
-        <SectionLabel className="mt-4">Outils IA</SectionLabel>
+        <SectionLabel className="mt-5">Outils IA</SectionLabel>
         {toolItems.map(item => (
           <NavItem
             key={item.href}
@@ -84,39 +90,29 @@ export function Sidebar() {
       </nav>
 
       {/* Bottom */}
-      <div className="px-3 pb-4 pt-3 space-y-0.5" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+      <div className="px-3 pb-4 pt-3 space-y-0.5" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
         {bottomItems.map(item => (
-          <NavItem
-            key={item.href}
-            item={item}
-            active={isActive(pathname, item.href)}
-          />
+          <NavItem key={item.href} item={item} active={isActive(pathname, item.href)} />
         ))}
 
         {/* User card */}
-        <div
-          className="mt-2 flex items-center gap-2.5 px-3 py-2.5 rounded-xl"
-          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}
-        >
-          <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
-            style={{ background: 'linear-gradient(135deg, #3B6BE8, #2563EB)' }}
-          >
+        <div className="mt-3 flex items-center gap-2.5 px-3 py-2.5 rounded-lg"
+          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
+            style={{ background: '#3B6BE8' }}>
             {(profil?.nom || 'U').charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold truncate" style={{ color: 'rgba(255,255,255,0.75)' }}>
+            <p className="text-xs font-medium truncate" style={{ color: 'rgba(255,255,255,0.65)' }}>
               {profil?.nom || 'Mon compte'}
             </p>
           </div>
-          <button
-            onClick={handleLogout}
-            className="p-1 rounded-lg transition-colors"
+          <button onClick={handleLogout}
+            className="p-1 rounded-md transition-colors"
             style={{ color: 'rgba(255,255,255,0.2)' }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#F87171'; (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.1)' }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.2)'; (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
-            title="Déconnexion"
-          >
+            title="Déconnexion">
             <LogOut className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -125,8 +121,6 @@ export function Sidebar() {
   )
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
 function isActive(pathname: string, href: string) {
   if (href === '/dashboard') return pathname === href
   return pathname === href || pathname.startsWith(href + '/')
@@ -134,8 +128,8 @@ function isActive(pathname: string, href: string) {
 
 function SectionLabel({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <p className={cn('text-[10px] font-bold uppercase tracking-widest px-3 pt-2 pb-1.5', className)}
-      style={{ color: 'rgba(255,255,255,0.18)' }}>
+    <p className={cn('text-[9px] font-bold uppercase tracking-[0.14em] px-3 pt-4 pb-1.5', className)}
+      style={{ color: 'rgba(255,255,255,0.2)' }}>
       {children}
     </p>
   )
@@ -153,21 +147,17 @@ function NavItem({ item, active, badge, isNew }: NavItemProps) {
   const Icon = item.icon
   return (
     <Link href={item.href} className={cn('nav-item', active && 'active')}>
-      <Icon className="w-4 h-4 flex-shrink-0" strokeWidth={active ? 2.5 : 2} />
+      <Icon className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={active ? 2.5 : 1.8} />
       <span className="flex-1 truncate">{item.label}</span>
       {badge !== undefined && badge > 0 && (
-        <span
-          className="w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center"
-          style={{ background: 'rgba(245,158,11,0.2)', color: '#FCD34D' }}
-        >
+        <span className="w-4.5 h-4.5 rounded-full text-[9px] font-bold flex items-center justify-center px-1.5"
+          style={{ background: 'rgba(245,158,11,0.15)', color: '#FCD34D' }}>
           {badge > 9 ? '9+' : badge}
         </span>
       )}
       {isNew && !badge && (
-        <span
-          className="text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none"
-          style={{ background: 'rgba(59,107,232,0.25)', color: '#7AAAFF' }}
-        >
+        <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full leading-none"
+          style={{ background: 'rgba(59,107,232,0.2)', color: '#7AAAFF' }}>
           NEW
         </span>
       )}

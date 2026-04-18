@@ -362,13 +362,13 @@ Tu peux aussi aider à rédiger des emails de relance et conseiller sur la gesti
                 onClick={() => selectAgent(agent)}
                 className="w-full text-left rounded-2xl p-3.5 transition-all"
                 style={{
-                  background: selected?.id === agent.id ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${selected?.id === agent.id ? 'rgba(124,58,237,0.35)' : 'rgba(255,255,255,0.06)'}`,
+                  background: selected?.id === agent.id ? 'rgba(59,107,232,0.12)' : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${selected?.id === agent.id ? 'rgba(59,107,232,0.28)' : 'rgba(255,255,255,0.06)'}`,
                 }}
               >
                 <div className="flex items-start gap-2.5">
                   <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
-                    style={{ background: 'rgba(124,58,237,0.15)' }}>
+                    style={{ background: 'rgba(59,107,232,0.12)' }}>
                     <Bot className="w-4 h-4 text-violet-400" />
                   </div>
                   <div className="min-w-0">
@@ -391,7 +391,7 @@ Tu peux aussi aider à rédiger des emails de relance et conseiller sur la gesti
           {!selected ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
               <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
-                style={{ background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.2)' }}>
+                style={{ background: 'rgba(59,107,232,0.1)', border: '1px solid rgba(59,107,232,0.15)' }}>
                 <Sparkles className="w-7 h-7 text-violet-400" />
               </div>
               <div className="text-center">
@@ -420,7 +420,7 @@ Tu peux aussi aider à rédiger des emails de relance et conseiller sur la gesti
               <div className="px-5 py-3.5 flex items-center gap-3"
                 style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                 <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-                  style={{ background: 'rgba(124,58,237,0.15)' }}>
+                  style={{ background: 'rgba(59,107,232,0.12)' }}>
                   <Bot className="w-4 h-4 text-violet-400" />
                 </div>
                 <div>
@@ -442,14 +442,14 @@ Tu peux aussi aider à rédiger des emails de relance et conseiller sur la gesti
                   <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     {msg.role === 'assistant' && (
                       <div className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 mr-2.5 mt-0.5"
-                        style={{ background: 'rgba(124,58,237,0.15)' }}>
+                        style={{ background: 'rgba(59,107,232,0.12)' }}>
                         <Bot className="w-3.5 h-3.5 text-violet-400" />
                       </div>
                     )}
                     <div
                       className="max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap"
                       style={msg.role === 'user' ? {
-                        background: 'linear-gradient(135deg, #7C3AED, #4F46E5)',
+                        background: 'linear-gradient(135deg, #3B6BE8, #2563EB)',
                         color: 'white',
                         borderBottomRightRadius: '4px',
                       } : {
@@ -484,7 +484,7 @@ Tu peux aussi aider à rédiger des emails de relance et conseiller sur la gesti
                 {sending && (
                   <div className="flex items-start gap-2.5">
                     <div className="w-7 h-7 rounded-xl flex items-center justify-center"
-                      style={{ background: 'rgba(124,58,237,0.15)' }}>
+                      style={{ background: 'rgba(59,107,232,0.12)' }}>
                       <Bot className="w-3.5 h-3.5 text-violet-400" />
                     </div>
                     <div className="px-4 py-3 rounded-2xl"

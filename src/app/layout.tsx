@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr" suppressHydrationWarning>
-      <body style={{ background: '#080B14' }}>
+      <body style={{ background: '#0C1628' }}>
         {children}
         <Toaster
           position="bottom-right"
@@ -23,7 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               fontFamily: 'Inter, sans-serif',
               fontSize: '13px',
               fontWeight: '500',
-              background: '#1A2235',
+              background: '#1B2A47',
               border: '1px solid rgba(255,255,255,0.08)',
               color: 'rgba(255,255,255,0.9)',
             },
