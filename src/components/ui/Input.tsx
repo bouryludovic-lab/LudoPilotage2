@@ -2,7 +2,7 @@ import { forwardRef, type InputHTMLAttributes, type TextareaHTMLAttributes, type
 import { cn } from '@/lib/utils'
 
 const INPUT_BASE = 'w-full rounded-xl px-4 py-3 text-sm font-medium outline-none transition-all duration-150 placeholder:text-white/25 disabled:opacity-40 disabled:cursor-default'
-const INPUT_STYLE = 'bg-white/5 border border-white/8 text-white/85 focus:border-violet-500/60 focus:bg-violet-500/5 focus:ring-2 focus:ring-violet-500/10'
+const INPUT_STYLE = 'bg-white/5 border border-white/8 text-white/85 focus:border-brand-600/60 focus:bg-brand-600/5 focus:ring-2 focus:ring-brand-600/10'
 
 interface FieldProps {
   label?: string
@@ -20,7 +20,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     <div className="flex flex-col gap-1.5">
       {label && (
         <label className="text-xs font-semibold text-white/50 tracking-wide uppercase">
-          {label}{required && <span className="text-violet-400 ml-0.5">*</span>}
+          {label}{required && <span className="text-brand-400 ml-0.5">*</span>}
         </label>
       )}
       <input
@@ -44,7 +44,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     <div className="flex flex-col gap-1.5">
       {label && (
         <label className="text-xs font-semibold text-white/50 tracking-wide uppercase">
-          {label}{required && <span className="text-violet-400 ml-0.5">*</span>}
+          {label}{required && <span className="text-brand-400 ml-0.5">*</span>}
         </label>
       )}
       <textarea
@@ -69,7 +69,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     <div className="flex flex-col gap-1.5">
       {label && (
         <label className="text-xs font-semibold text-white/50 tracking-wide uppercase">
-          {label}{required && <span className="text-violet-400 ml-0.5">*</span>}
+          {label}{required && <span className="text-brand-400 ml-0.5">*</span>}
         </label>
       )}
       <div className="relative">

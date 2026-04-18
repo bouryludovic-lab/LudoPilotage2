@@ -18,7 +18,7 @@ export function Topbar({ title, subtitle, actions }: TopbarProps) {
     <header
       className="h-[60px] flex items-center justify-between px-6 sticky top-0 z-20"
       style={{
-        background: 'rgba(8,11,20,0.85)',
+        background: 'rgba(12,22,40,0.9)',
         backdropFilter: 'blur(12px)',
         borderBottom: '1px solid rgba(255,255,255,0.05)',
       }}
@@ -47,7 +47,7 @@ export function Topbar({ title, subtitle, actions }: TopbarProps) {
         <Link
           href="/factures/nouvelle"
           className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-semibold rounded-xl transition-all active:scale-95"
-          style={{ background: 'linear-gradient(135deg, #7C3AED, #4F46E5)', color: 'white' }}
+          style={{ background: 'linear-gradient(135deg, #3B6BE8, #2563EB)', color: 'white' }}
         >
           <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
           <span className="hidden sm:inline">Nouvelle facture</span>

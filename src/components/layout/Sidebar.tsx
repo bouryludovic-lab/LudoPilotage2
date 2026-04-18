@@ -8,7 +8,7 @@ import { storage } from '@/lib/storage'
 import {
   LayoutDashboard, FileText, Users, MessageSquare,
   Bot, ClipboardList, GraduationCap, Settings,
-  LogOut, Zap, User, StickyNote,
+  LogOut, User, StickyNote,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -44,19 +44,19 @@ export function Sidebar() {
   return (
     <aside
       className="fixed left-0 top-0 h-screen w-[220px] flex flex-col z-30 select-none"
-      style={{ background: '#0E1420', borderRight: '1px solid rgba(255,255,255,0.05)' }}
+      style={{ background: '#111E35', borderRight: '1px solid rgba(255,255,255,0.04)' }}
     >
       {/* Logo */}
       <div className="px-4 py-5 flex items-center gap-3">
         <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: 'linear-gradient(135deg, #7C3AED, #4F46E5)' }}
+          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 font-bold text-white text-[11px] tracking-tight"
+          style={{ background: 'linear-gradient(135deg, #3B6BE8, #2563EB)', letterSpacing: '-0.02em' }}
         >
-          <Zap className="w-[18px] h-[18px] text-white" strokeWidth={2.5} />
+          TNS
         </div>
         <div className="min-w-0">
-          <p className="text-[13px] font-bold text-white leading-none truncate">LudoPilotage</p>
-          <p className="text-[10px] mt-0.5 leading-none font-medium" style={{ color: 'rgba(167,139,250,0.6)' }}>SaaS IA</p>
+          <p className="text-[12px] font-bold text-white leading-none truncate tracking-wide">THE NEXT STEP</p>
+          <p className="text-[9px] mt-1 leading-none font-medium tracking-widest uppercase" style={{ color: 'rgba(122,170,255,0.55)' }}>Consulting & Strategy</p>
         </div>
       </div>
 
@@ -84,7 +84,7 @@ export function Sidebar() {
       </nav>
 
       {/* Bottom */}
-      <div className="px-3 pb-4 pt-3 space-y-0.5" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+      <div className="px-3 pb-4 pt-3 space-y-0.5" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         {bottomItems.map(item => (
           <NavItem
             key={item.href}
@@ -100,7 +100,7 @@ export function Sidebar() {
         >
           <div
             className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
-            style={{ background: 'linear-gradient(135deg, #7C3AED, #4F46E5)' }}
+            style={{ background: 'linear-gradient(135deg, #3B6BE8, #2563EB)' }}
           >
             {(profil?.nom || 'U').charAt(0).toUpperCase()}
           </div>
@@ -166,7 +166,7 @@ function NavItem({ item, active, badge, isNew }: NavItemProps) {
       {isNew && !badge && (
         <span
           className="text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none"
-          style={{ background: 'rgba(124,58,237,0.25)', color: '#A78BFA' }}
+          style={{ background: 'rgba(59,107,232,0.25)', color: '#7AAAFF' }}
         >
           NEW
         </span>

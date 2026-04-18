@@ -15,7 +15,7 @@
   }
 
   body {
-    background-color: #080B14;
+    background-color: #0C1628;
     color: rgba(255, 255, 255, 0.87);
     font-size: 14px;
     line-height: 1.5;
@@ -29,7 +29,7 @@
 
   /* Selection */
   ::selection {
-    background: rgba(124, 58, 237, 0.35);
+    background: rgba(59, 107, 232, 0.35);
   }
 }
 
@@ -51,7 +51,7 @@
 
   /* Gradient text */
   .gradient-text {
-    background: linear-gradient(135deg, #A78BFA, #818CF8);
+    background: linear-gradient(135deg, #7AAAFF, #93C5FD);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -66,11 +66,11 @@
   }
   .pin-btn:hover {
     background: rgba(255, 255, 255, 0.10);
-    border-color: rgba(124, 58, 237, 0.5);
+    border-color: rgba(59, 107, 232, 0.5);
   }
   .pin-btn:active {
     transform: scale(0.94);
-    background: rgba(124, 58, 237, 0.2);
+    background: rgba(59, 107, 232, 0.2);
   }
 
   /* Skeleton shimmer */
@@ -96,9 +96,9 @@
     color: rgba(255, 255, 255, 0.85);
   }
   .nav-item.active {
-    background: rgba(124, 58, 237, 0.2);
-    color: #A78BFA;
-    border: 1px solid rgba(124, 58, 237, 0.3);
+    background: rgba(59, 107, 232, 0.18);
+    color: #7AAAFF;
+    border: 1px solid rgba(59, 107, 232, 0.3);
   }
 
   /* Input dark */
@@ -113,19 +113,19 @@
     color: rgba(255, 255, 255, 0.3);
   }
   .input-dark:focus {
-    border-color: rgba(124, 58, 237, 0.6);
-    background: rgba(124, 58, 237, 0.06);
-    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+    border-color: rgba(59, 107, 232, 0.6);
+    background: rgba(59, 107, 232, 0.06);
+    box-shadow: 0 0 0 3px rgba(59, 107, 232, 0.1);
   }
 
   /* Badge */
   .badge {
     @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
   }
-  .badge-violet  { background: rgba(124,58,237,0.2); color: #A78BFA; }
-  .badge-green   { background: rgba(34,197,94,0.15); color: #4ADE80; }
+  .badge-violet  { background: rgba(59,107,232,0.2);  color: #7AAAFF; }
+  .badge-green   { background: rgba(34,197,94,0.15);  color: #4ADE80; }
   .badge-amber   { background: rgba(245,158,11,0.15); color: #FCD34D; }
-  .badge-red     { background: rgba(239,68,68,0.15); color: #F87171; }
+  .badge-red     { background: rgba(239,68,68,0.15);  color: #F87171; }
   .badge-blue    { background: rgba(59,130,246,0.15); color: #93C5FD; }
   .badge-slate   { background: rgba(148,163,184,0.1); color: rgba(148,163,184,0.8); }
 
@@ -155,10 +155,10 @@
     pointer-events: none;
   }
   .orb-violet {
-    background: radial-gradient(circle, rgba(124,58,237,0.35), transparent 70%);
+    background: radial-gradient(circle, rgba(59,107,232,0.3), transparent 70%);
   }
   .orb-indigo {
-    background: radial-gradient(circle, rgba(79,70,229,0.3), transparent 70%);
+    background: radial-gradient(circle, rgba(37,99,235,0.25), transparent 70%);
   }
 }
 

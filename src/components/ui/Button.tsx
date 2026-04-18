@@ -14,11 +14,11 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const BASE = 'inline-flex items-center gap-1.5 font-semibold rounded-xl transition-all duration-150 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap select-none'
 
 const VARIANTS: Record<Variant, string> = {
-  primary:   'bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-500 hover:to-indigo-500 shadow-glow-sm active:scale-95',
+  primary:   'bg-gradient-brand text-white shadow-glow-sm active:scale-95 hover:opacity-90',
   secondary: 'bg-white/8 text-white/75 border border-white/10 hover:bg-white/12 hover:text-white active:scale-95',
   ghost:     'text-white/50 hover:bg-white/6 hover:text-white/85 active:scale-95',
   danger:    'bg-red-500/15 text-red-400 border border-red-500/20 hover:bg-red-500/25 active:scale-95',
-  outline:   'border border-violet-500/40 text-violet-400 hover:bg-violet-500/10 active:scale-95',
+  outline:   'border border-brand-600/40 text-brand-400 hover:bg-brand-600/10 active:scale-95',
 }
 
 const SIZES: Record<Size, string> = {
