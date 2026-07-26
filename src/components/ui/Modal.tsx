@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from './Button'
@@ -16,6 +16,10 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, title, children, footer, wide, size = 'md' }: ModalProps) {
+  // Close on backdrop click only if the mouse press STARTED on the backdrop —
+  // otherwise selecting text in an input and releasing outside closes the modal
+  const mouseDownOnBackdrop = useRef(false)
+
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -36,7 +40,8 @@ export function Modal({ open, onClose, title, children, footer, wide, size = 'md
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
       style={{ background: 'rgba(8,11,20,0.85)', backdropFilter: 'blur(8px)' }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      onMouseDown={(e) => { mouseDownOnBackdrop.current = e.target === e.currentTarget }}
+      onClick={(e) => { if (e.target === e.currentTarget && mouseDownOnBackdrop.current) onClose() }}
     >
       <div className={cn(
         'glass-strong rounded-2xl w-full max-h-[90vh] overflow-y-auto animate-slide-up shadow-card',

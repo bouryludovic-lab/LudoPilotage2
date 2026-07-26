@@ -1,165 +1,53 @@
-import { AT_BASE, AT_FIELDS, AT_TABLES, type Client, type Invoice, type Profil, type TableName } from './types'
+import { AT_FIELDS, AT_TABLES, type Client, type Invoice, type Profil, type TableName } from './types'
 import { storage } from './storage'
 
-// ─── Core client (client-side, uses localStorage token) ─────────────────────
+// ─── Core client — all reads/writes go through the server proxy /api/airtable
+//     (AIRTABLE_TOKEN lives server-side; at_token in the browser is the user's
+//     email, used only to scope records) ─────────────────────────────────────
 
-function headers(): HeadersInit {
-  return {
-    Authorization: `Bearer ${storage.getToken()}`,
-    'Content-Type': 'application/json',
-  }
+function userEmail(): string {
+  return storage.getToken()
 }
 
-function url(table: string, id = '') {
-  return `https://api.airtable.com/v0/${AT_BASE}/${table}${id ? '/' + id : ''}`
-}
-
-async function getAll(table: string): Promise<Array<{ id: string; fields: Record<string, unknown> }>> {
-  if (!storage.getToken()) return []
-  const records: Array<{ id: string; fields: Record<string, unknown> }> = []
-  let offset: string | null = null
-
-  do {
-    const u: string = url(table) + '?pageSize=100' + (offset ? '&offset=' + offset : '')
-    const r = await fetch(u, { headers: headers() })
-    if (!r.ok) throw new Error(`Airtable ${r.status}: ${r.statusText}`)
-    const d = await r.json()
-    const normalized = (d.records ?? []).map((rec: { id: string; fields?: Record<string, unknown>; cellValuesByFieldId?: Record<string, unknown> }) => ({
-      id: rec.id,
-      fields: rec.fields ?? rec.cellValuesByFieldId ?? {},
-    }))
-    records.push(...normalized)
-    offset = d.offset ?? null
-  } while (offset)
-
-  return records
+async function atProxy(body: Record<string, unknown>) {
+  const res = await fetch('/api/airtable', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const d = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(typeof d.error === 'string' ? d.error : `Airtable ${res.status}`)
+  return d
 }
 
 async function create(table: string, fields: Record<string, unknown>) {
-  if (!storage.getToken()) return null
-  const r = await fetch(url(table), {
-    method: 'POST',
-    headers: headers(),
-    body: JSON.stringify({ records: [{ fields }] }),
-  })
-  if (!r.ok) throw new Error(`Airtable create ${r.status}`)
-  const d = await r.json()
+  const d = await atProxy({ table, method: 'POST', fields })
   return d.records?.[0] ?? null
 }
 
 async function update(table: string, id: string, fields: Record<string, unknown>) {
-  if (!storage.getToken()) return null
-  const r = await fetch(url(table, id), {
-    method: 'PATCH',
-    headers: headers(),
-    body: JSON.stringify({ fields }),
-  })
-  if (!r.ok) throw new Error(`Airtable update ${r.status}`)
-  return await r.json()
+  return atProxy({ table, method: 'PATCH', id, fields })
 }
 
 async function del(table: string, id: string) {
-  if (!storage.getToken()) return
-  const r = await fetch(url(table, id), { method: 'DELETE', headers: headers() })
-  if (!r.ok) throw new Error(`Airtable delete ${r.status}`)
+  await atProxy({ table, method: 'DELETE', id })
 }
-
-// ─── Auth helpers ─────────────────────────────────────────────────────────────
-
-export async function fetchProfilByBootstrapToken(bootstrapToken: string): Promise<Array<{ id: string; fields: Record<string, unknown> }>> {
-  const r = await fetch(url(AT_TABLES.profils), {
-    headers: {
-      Authorization: `Bearer ${bootstrapToken}`,
-      'Content-Type': 'application/json',
-    },
-  })
-  if (!r.ok) throw new Error('Token invalide')
-  const d = await r.json()
-  return (d.records ?? []).map((rec: { id: string; fields?: Record<string, unknown>; cellValuesByFieldId?: Record<string, unknown> }) => ({
-    id: rec.id,
-    fields: rec.fields ?? rec.cellValuesByFieldId ?? {},
-  }))
-}
-
-// ─── Domain sync (new tables, field names) ────────────────────────────────────
 
 const F = AT_FIELDS
-
-export async function syncClients(): Promise<Client[]> {
-  const records = await getAll(AT_TABLES.clients)
-  return records.map(rec => ({
-    id:      rec.id,
-    atId:    rec.id,
-    nom:     String(rec.fields[F.clients.nom]     ?? ''),
-    email:   String(rec.fields[F.clients.email]   ?? ''),
-    tel:     String(rec.fields[F.clients.tel]      ?? ''),
-    adresse: String(rec.fields[F.clients.adresse]  ?? ''),
-    siret:   String(rec.fields[F.clients.siret]    ?? ''),
-    notes:   String(rec.fields[F.clients.notes]    ?? ''),
-  }))
-}
-
-export async function syncFactures(): Promise<Invoice[]> {
-  const records = await getAll(AT_TABLES.factures)
-  return records.map(rec => {
-    const f = rec.fields
-    let lignes: Invoice['lignes'] = []
-    try {
-      const raw = f[F.factures.prestation]
-      if (typeof raw === 'string' && raw.startsWith('[')) lignes = JSON.parse(raw)
-    } catch {}
-    return {
-      id:           rec.id,
-      atId:         rec.id,
-      num:          String(f[F.factures.num]           ?? ''),
-      date:         String(f[F.factures.date]          ?? ''),
-      echeance:     String(f[F.factures.echeance]      ?? ''),
-      echeanceLabel:'',
-      clientId:     '',
-      clientNom:    String(f[F.factures.client_nom]    ?? ''),
-      clientEmail:  String(f[F.factures.client_email]  ?? ''),
-      clientAdresse:'',
-      clientSiret:  '',
-      paiement:     String(f[F.factures.paiement]      ?? ''),
-      iban:         '',
-      notes:        String(f[F.factures.notes]         ?? ''),
-      lignes,
-      total:        Number(f[F.factures.montant]       ?? 0),
-      statut:       (String(f[F.factures.statut]       ?? 'pending')) as Invoice['statut'],
-      dateEnvoi:    f[F.factures.date_envoi]  ? String(f[F.factures.date_envoi])  : undefined,
-      pdfUrl:       f[F.factures.pdf_url]     ? String(f[F.factures.pdf_url])     : undefined,
-      emailEnvoye:  Boolean(f[F.factures.email_envoye]),
-    }
-  })
-}
-
-export async function syncProfil(): Promise<Profil | null> {
-  const records = await getAll(AT_TABLES.profils)
-  if (!records.length) return null
-  const rec = records[0]
-  const f = rec.fields
-  return {
-    atId:    rec.id,
-    nom:     String(f[F.profils.nom]     ?? ''),
-    siret:   String(f[F.profils.siret]   ?? ''),
-    adresse: String(f[F.profils.adresse] ?? ''),
-    email:   String(f[F.profils.email]   ?? ''),
-    tel:     String(f[F.profils.tel]     ?? ''),
-    iban:    String(f[F.profils.iban]    ?? ''),
-    prefix:  String(f[F.profils.prefix]  ?? 'F-'),
-  }
-}
 
 // ─── CRUD wrappers ────────────────────────────────────────────────────────────
 
 export async function createClient(client: Omit<Client, 'id' | 'atId'>): Promise<string | null> {
   const rec = await create(AT_TABLES.clients, {
-    [F.clients.nom]:     client.nom,
-    [F.clients.email]:   client.email,
-    [F.clients.tel]:     client.tel,
-    [F.clients.adresse]: client.adresse,
-    [F.clients.siret]:   client.siret,
-    [F.clients.notes]:   client.notes ?? '',
+    [F.clients.nom]:        client.nom,
+    [F.clients.email]:      client.email,
+    [F.clients.tel]:        client.tel,
+    [F.clients.adresse]:    client.adresse,
+    [F.clients.siret]:      client.siret,
+    [F.clients.notes]:      client.notes ?? '',
+    // user_email scopes the record to this account — without it the record
+    // is invisible to sync and would vanish from the app on next refresh
+    [F.clients.user_email]: userEmail(),
   })
   return rec?.id ?? null
 }
@@ -191,6 +79,7 @@ export async function createFacture(inv: Invoice): Promise<string | null> {
     [F.factures.prestation]:  JSON.stringify(inv.lignes),
     [F.factures.paiement]:    inv.paiement,
     [F.factures.notes]:       inv.notes,
+    [F.factures.user_email]:  userEmail(),
   })
   return rec?.id ?? null
 }

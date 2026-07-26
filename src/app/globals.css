@@ -25,6 +25,14 @@
   ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
 
   ::selection { background: rgba(59,107,232,0.35); }
+
+  /* Native select dropdowns: the app text is white, but the OS renders the
+     option list on a white background — force a dark list so options stay readable */
+  select { color-scheme: dark; }
+  select option {
+    background-color: #0F1B33;
+    color: rgba(255, 255, 255, 0.9);
+  }
 }
 
 @layer components {

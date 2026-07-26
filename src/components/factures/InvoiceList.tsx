@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Trash2, Send, FileText, Download, ChevronDown } from 'lucide-react'
 import { StatusBadge } from '@/components/ui/Badge'
+import { STATUS_LABELS } from '@/lib/utils'
 import { ConfirmModal } from '@/components/ui/Modal'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { SkeletonRow } from '@/components/ui/Spinner'
@@ -191,9 +192,9 @@ export function InvoiceList({ loading }: InvoiceListProps) {
                               <button
                                 key={ns}
                                 onClick={() => handleChangeStatus(fac, ns)}
-                                className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 transition-colors"
+                                className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors"
                               >
-                                Marquer comme → <span className="font-medium">{ns}</span>
+                                Marquer comme → <span className="font-medium">{STATUS_LABELS[ns]}</span>
                               </button>
                             ))}
                           </div>

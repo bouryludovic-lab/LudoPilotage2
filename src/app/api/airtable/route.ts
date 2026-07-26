@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
       const r = await fetch(atUrl(table), {
         method: 'POST',
         headers: atHeaders(token),
-        body: JSON.stringify({ records: [{ fields }] }),
+        body: JSON.stringify({ records: [{ fields }], typecast: true }),
       })
       const d = await r.json()
       if (!r.ok) return NextResponse.json({ error: d.error ?? 'Create failed' }, { status: r.status })
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
       const r = await fetch(atUrl(table, id), {
         method: 'PATCH',
         headers: atHeaders(token),
-        body: JSON.stringify({ fields }),
+        body: JSON.stringify({ fields, typecast: true }),
       })
       const d = await r.json()
       if (!r.ok) return NextResponse.json({ error: d.error ?? 'Update failed' }, { status: r.status })
