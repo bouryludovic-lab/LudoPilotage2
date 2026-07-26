@@ -47,18 +47,22 @@ export function formatDateShort(dateStr: string): string {
 // ─── Invoice number generation ───────────────────────────────────────────────
 
 export function generateInvoiceNum(prefix: string, existingNums: string[]): string {
-  const year = new Date().getFullYear()
-  const yearStr = String(year)
+  const year = String(new Date().getFullYear())
 
+  // Heal prefixes that already embed a year (e.g. "TNS-2026-04" → "TNS-"),
+  // otherwise the year would be appended twice: "TNS-2026-042026-001"
+  const stem = prefix.replace(/20\d{2}.*$/, '') || 'F-'
+  const base = `${stem}${year}-`
+
+  // Continue the sequence of numbers issued under the same prefix+year only,
+  // so foreign series (e.g. old "2026-3001") don't pollute the numbering
   const used = existingNums
-    .filter(n => n.includes(yearStr))
-    .map(n => {
-      const parts = n.split('-')
-      return parseInt(parts[parts.length - 1], 10) || 0
-    })
+    .filter(n => n.startsWith(base))
+    .map(n => parseInt(n.slice(base.length), 10) || 0)
+    .filter(n => n > 0)
 
   const next = used.length > 0 ? Math.max(...used) + 1 : 1
-  return `${prefix}${yearStr}-${String(next).padStart(3, '0')}`
+  return `${base}${String(next).padStart(3, '0')}`
 }
 
 // ─── Due date labels ─────────────────────────────────────────────────────────
