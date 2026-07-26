@@ -199,9 +199,8 @@ export async function updateFactureStatut(atId: string, statut: string) {
   return update(AT_TABLES.factures, atId, { [F.factures.statut]: statut })
 }
 
-export async function updateFacturePdfUrl(atId: string, pdfUrl: string) {
+export async function markFactureSent(atId: string) {
   return update(AT_TABLES.factures, atId, {
-    [F.factures.pdf_url]:      pdfUrl,
     [F.factures.email_envoye]: true,
     [F.factures.date_envoi]:   new Date().toISOString().split('T')[0],
   })
@@ -225,43 +224,6 @@ export async function updateProfilInAirtable(atId: string, profil: Partial<Profi
     ? profil.design
     : JSON.stringify(profil.design)
   return update(AT_TABLES.profils, atId, fields)
-}
-
-// ─── GitHub PDF upload ───────────────────────────────────────────────────────
-
-export async function uploadPdfToGitHub(
-  filename: string,
-  base64Content: string,
-  ghToken: string,
-): Promise<string> {
-  const owner = 'bouryludovic-lab'
-  const repo  = 'LudoPilotage2'
-  const path  = `factures/${filename}`
-  const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`
-
-  let sha: string | undefined
-  try {
-    const check = await fetch(apiUrl, {
-      headers: { Authorization: `Bearer ${ghToken}`, Accept: 'application/vnd.github.v3+json' },
-    })
-    if (check.ok) { const data = await check.json(); sha = data.sha }
-  } catch {}
-
-  const body: Record<string, unknown> = { message: `Add invoice ${filename}`, content: base64Content }
-  if (sha) body.sha = sha
-
-  const res = await fetch(apiUrl, {
-    method: 'PUT',
-    headers: {
-      Authorization: `Bearer ${ghToken}`,
-      Accept: 'application/vnd.github.v3+json',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  })
-
-  if (!res.ok) throw new Error(`GitHub upload failed: ${res.status}`)
-  return `https://${owner}.github.io/${repo}/${path}`
 }
 
 // ─── Make webhook ─────────────────────────────────────────────────────────────

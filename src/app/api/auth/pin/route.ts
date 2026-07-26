@@ -53,7 +53,6 @@ export async function POST(req: NextRequest) {
       iban:    String(f[F.iban]    ?? ''),
       prefix:  String(f[F.prefix]  ?? 'F-'),
       webhook: f[F.webhook]  ? String(f[F.webhook])  : undefined,
-      ghToken: f[F.gh_token] ? String(f[F.gh_token]) : undefined,
     }
 
     return NextResponse.json({ ok: true, userEmail, profil })

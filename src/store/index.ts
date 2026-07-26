@@ -123,7 +123,6 @@ async function serverSyncAll(): Promise<{ factures: Invoice[]; clients: Client[]
       iban:    String(f[F.profils.iban]    ?? ''),
       prefix:  String(f[F.profils.prefix]  ?? 'F-'),
       webhook: f[F.profils.webhook]   ? String(f[F.profils.webhook])   : undefined,
-      ghToken: f[F.profils.gh_token]  ? String(f[F.profils.gh_token])  : undefined,
       design,
     }
   }

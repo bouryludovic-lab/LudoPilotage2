@@ -30,7 +30,6 @@ function ConfigurationContent() {
 
   const [webhook,   setWebhook]   = useState('')
   const [claudeKey, setClaudeKey] = useState('')
-  const [ghToken,   setGhToken]   = useState('')
   const [atToken,   setAtToken]   = useState('')
 
   const [gmailConnected, setGmailConnected] = useState(false)
@@ -39,7 +38,6 @@ function ConfigurationContent() {
     setAtToken(storage.getToken())
     setWebhook(config.webhook   ?? '')
     setClaudeKey(config.claudeKey ?? '')
-    setGhToken(config.ghToken   ?? '')
 
     // ── Handle Gmail OAuth callback params ───────────────────────────────────
     const gmailSuccess = searchParams.get('gmail_success')
@@ -106,8 +104,8 @@ function ConfigurationContent() {
   function saveConfig() {
     setSaving(true)
     storage.setToken(atToken)
-    setConfig({ ...config, webhook, claudeKey, ghToken })
-    setProfil({ ...profil, webhook, ghToken, claudeKey })
+    setConfig({ ...config, webhook, claudeKey })
+    setProfil({ ...profil, webhook, claudeKey })
     toast.success('Configuration sauvegardée')
     setSaving(false)
   }
@@ -160,16 +158,6 @@ function ConfigurationContent() {
             placeholder="sk-ant-api03-XXXXXXXX" show={showTokens} />
           <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.3)' }}>
             Utilisée directement par les agents IA dans le module Agent.
-          </p>
-        </Section>
-
-        {/* GitHub */}
-        <Section icon={Shield} title="Stockage PDF (GitHub)" description="Token GitHub pour stocker les PDFs générés">
-          <PasswordField label="Token GitHub (ghp_…)" value={ghToken} onChange={setGhToken}
-            placeholder="ghp_XXXXXXXXXXXXXXXX" show={showTokens} />
-          <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.3)' }}>
-            Les PDFs seront stockés sur <code className="px-1 py-0.5 rounded text-xs"
-              style={{ background: 'rgba(255,255,255,0.08)' }}>bouryludovic-lab/LudoPilotage2/factures/</code>
           </p>
         </Section>
 

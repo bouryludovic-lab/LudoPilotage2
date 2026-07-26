@@ -83,7 +83,6 @@ export interface Profil {
   logo?: string
   pin?: string
   webhook?: string
-  ghToken?: string
   claudeKey?: string
   /** Invoice visual design & bank details */
   design?: InvoiceDesign
@@ -93,7 +92,6 @@ export interface Config {
   webhook?: string
   token?: string
   claudeKey?: string
-  ghToken?: string
 }
 
 // ─── New SaaS Models ─────────────────────────────────────────────────────────
@@ -258,7 +256,6 @@ export const AT_FIELDS = {
     prefix:    'prefix',
     pin:       'pin',
     webhook:   'webhook',
-    gh_token:  'gh_token',
     claude_key:'claude_key',
   },
   factures: {
