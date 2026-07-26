@@ -18,7 +18,7 @@ const schema = z.object({
   email:   z.string().email('Email invalide').or(z.literal('')),
   tel:     z.string(),
   adresse: z.string(),
-  siret:   z.string().refine(v => !v || /^\d{14}$/.test(v.replace(/\s/g, '')), 'SIRET invalide (14 chiffres)'),
+  siret:   z.string(),
   notes:   z.string(),
 })
 
@@ -115,10 +115,10 @@ export function ClientModal({ open, onClose, client }: ClientModalProps) {
           {...register('adresse')}
         />
         <Input
-          label="SIRET"
-          placeholder="12345678901234"
+          label="SIRET / Licence number"
+          placeholder="SIRET, licence DED, EIN…"
           error={errors.siret?.message}
-          hint="14 chiffres, sans espaces"
+          hint="Champ libre — SIRET français (14 chiffres), licence Dubaï, EIN, etc."
           {...register('siret')}
         />
         <Textarea

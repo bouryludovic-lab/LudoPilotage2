@@ -159,7 +159,7 @@ export async function buildInvoiceDoc(invoice: Invoice, profil: Profil) {
   const toLines = [
     invoice.clientAdresse || '',
     invoice.clientEmail || '',
-    invoice.clientSiret ? `SIRET : ${invoice.clientSiret}` : '',
+    invoice.clientSiret ? `SIRET / Licence : ${invoice.clientSiret}` : '',
   ]
   const yFrom = partyBlock(colFrom, 'De', profil.nom, fromLines)
   const yTo   = partyBlock(colTo, 'Facturé à', invoice.clientNom, toLines)
