@@ -9,7 +9,7 @@ import { ConfirmModal } from '@/components/ui/Modal'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { SkeletonRow } from '@/components/ui/Spinner'
 import { formatEur, formatDate, exportCSV } from '@/lib/utils'
-import { deleteFacture, updateFactureStatut } from '@/lib/airtable'
+import { deleteFacture, updateFactureStatut, createFacture } from '@/lib/airtable'
 import { useAppStore } from '@/store'
 import type { Invoice, InvoiceStatus } from '@/lib/types'
 import { SendInvoiceModal } from './SendInvoiceModal'
@@ -37,7 +37,7 @@ interface InvoiceListProps {
 }
 
 export function InvoiceList({ loading }: InvoiceListProps) {
-  const { factures, deleteFacture: localDelete, updateFacture } = useAppStore()
+  const { factures, deleteFacture: localDelete, updateFacture, syncAll } = useAppStore()
   const [filter, setFilter]       = useState<InvoiceStatus | 'all'>('all')
   const [search, setSearch]       = useState('')
   const [deleteId, setDeleteId]   = useState<string | null>(null)
@@ -79,12 +79,27 @@ export function InvoiceList({ loading }: InvoiceListProps) {
     updateFacture(fac.id, { statut: newStatus })
     setStatusOpen(null)
     try {
-      if (fac.atId) await updateFactureStatut(fac.atId, newStatus)
-      toast.success(`Statut mis à jour → ${newStatus}`)
+      if (!fac.atId) throw new Error('no atId')
+      await updateFactureStatut(fac.atId, newStatus)
+      toast.success(`Statut mis à jour → ${STATUS_LABELS[newStatus]}`)
     } catch {
-      // Rollback
-      updateFacture(fac.id, { statut: fac.statut })
-      toast.error('Erreur mise à jour du statut')
+      // Stale or missing Airtable record — resync, find the real record by
+      // invoice number and patch it; only create if it genuinely doesn't exist
+      try {
+        await syncAll()
+        const fresh = useAppStore.getState().factures.find(f => f.atId && f.num === fac.num)
+        if (fresh?.atId) {
+          await updateFactureStatut(fresh.atId, newStatus)
+          updateFacture(fresh.id, { statut: newStatus })
+        } else {
+          const atId = await createFacture({ ...fac, statut: newStatus })
+          updateFacture(fac.id, { statut: newStatus, atId: atId ?? undefined })
+        }
+        toast.success(`Statut mis à jour → ${STATUS_LABELS[newStatus]}`)
+      } catch (e) {
+        updateFacture(fac.id, { statut: fac.statut })
+        toast.error(`Statut non enregistré — Airtable a refusé : ${e instanceof Error ? e.message : 'erreur inconnue'}`)
+      }
     }
   }
 

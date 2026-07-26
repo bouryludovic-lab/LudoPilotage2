@@ -18,7 +18,7 @@ interface ClientListProps {
 }
 
 export function ClientList({ loading }: ClientListProps) {
-  const { clients, factures, deleteClient: localDelete } = useAppStore()
+  const { clients, factures, deleteClient: localDelete, syncAll } = useAppStore()
 
   const [modalOpen, setModalOpen]   = useState(false)
   const [editClient, setEditClient] = useState<Client | null>(null)
@@ -56,11 +56,21 @@ export function ClientList({ loading }: ClientListProps) {
     const client = clients.find(c => c.id === deleteId)
     try {
       if (client?.atId) await deleteClientAT(client.atId)
+    } catch {
+      // Stale record id — resync and delete the real record (matched by name)
+      // so it doesn't come back at the next sync
+      try {
+        await syncAll()
+        const fresh = useAppStore.getState().clients.find(c =>
+          c.atId && client && c.nom.trim().toLowerCase() === client.nom.trim().toLowerCase())
+        if (fresh?.atId) {
+          await deleteClientAT(fresh.atId)
+          localDelete(fresh.id)
+        }
+      } catch { /* server copy untouched — it will resurface at next sync */ }
+    } finally {
       localDelete(deleteId)
       toast.success('Client supprimé')
-    } catch {
-      toast.error('Erreur lors de la suppression')
-    } finally {
       setDeleting(false)
       setDeleteId(null)
     }

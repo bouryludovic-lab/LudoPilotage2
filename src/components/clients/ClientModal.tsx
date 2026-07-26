@@ -31,7 +31,7 @@ interface ClientModalProps {
 }
 
 export function ClientModal({ open, onClose, client }: ClientModalProps) {
-  const { addClient, updateClient: updateLocalClient } = useAppStore()
+  const { addClient, updateClient: updateLocalClient, syncAll } = useAppStore()
 
   const {
     register, handleSubmit, reset,
@@ -55,15 +55,29 @@ export function ClientModal({ open, onClose, client }: ClientModalProps) {
       if (client) {
         // Update
         updateLocalClient(client.id, data)
-        if (client.atId) {
+        try {
+          if (!client.atId) throw new Error('no atId')
+          await updateClientAT(client.atId, data)
+          toast.success('Client mis à jour')
+        } catch {
+          // Stale or missing Airtable record (e.g. id from the pre-migration
+          // table) — resync, find the real record by name, and patch that one;
+          // only create if it genuinely doesn't exist (avoids duplicates)
           try {
-            await updateClientAT(client.atId, data)
+            await syncAll()
+            const fresh = useAppStore.getState().clients.find(c =>
+              c.atId && c.nom.trim().toLowerCase() === client.nom.trim().toLowerCase())
+            if (fresh?.atId) {
+              await updateClientAT(fresh.atId, data)
+              updateLocalClient(fresh.id, data)
+            } else {
+              const atId = await createClient(data)
+              updateLocalClient(client.id, { atId: atId ?? undefined })
+            }
             toast.success('Client mis à jour')
           } catch (e) {
             toast.warning(`Modifié localement seulement — Airtable a refusé : ${e instanceof Error ? e.message : 'erreur inconnue'}`)
           }
-        } else {
-          toast.success('Client mis à jour (local)')
         }
       } else {
         // Create
