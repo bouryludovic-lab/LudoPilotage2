@@ -56,19 +56,25 @@ export function ClientModal({ open, onClose, client }: ClientModalProps) {
         // Update
         updateLocalClient(client.id, data)
         if (client.atId) {
-          await updateClientAT(client.atId, data).catch(() => {
-            toast.warning('Mis à jour localement — sync Airtable échouée')
-          })
+          try {
+            await updateClientAT(client.atId, data)
+            toast.success('Client mis à jour')
+          } catch (e) {
+            toast.warning(`Modifié localement seulement — Airtable a refusé : ${e instanceof Error ? e.message : 'erreur inconnue'}`)
+          }
+        } else {
+          toast.success('Client mis à jour (local)')
         }
-        toast.success('Client mis à jour')
       } else {
         // Create
         const newClient: Client = { id: uid(), ...data }
-        const atId = await createClient(data).catch(() => null)
-        if (atId) newClient.atId = atId
+        try {
+          newClient.atId = (await createClient(data)) ?? undefined
+          toast.success('Client créé')
+        } catch (e) {
+          toast.warning(`Client sauvegardé localement — Airtable a refusé : ${e instanceof Error ? e.message : 'erreur inconnue'}`)
+        }
         addClient(newClient)
-        toast.success('Client créé')
-        if (!atId) toast.warning('Sync Airtable échouée — client sauvegardé localement')
       }
       onClose()
     } catch (e) {

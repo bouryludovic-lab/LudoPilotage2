@@ -11,6 +11,9 @@ import {
   LogOut, User, StickyNote,
 } from 'lucide-react'
 
+// Bump on every deploy — lets us check at a glance that the browser runs the latest build
+export const APP_VERSION = 'v2.1 — 27/07/2026'
+
 const NAV_ITEMS = [
   { href: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard',      group: 'main' },
   { href: '/factures',      icon: FileText,         label: 'Facturation',    group: 'main', badge: true },
@@ -116,6 +119,10 @@ export function Sidebar() {
             <LogOut className="w-3.5 h-3.5" />
           </button>
         </div>
+
+        <p className="text-center text-[9px] pt-2" style={{ color: 'rgba(255,255,255,0.18)' }}>
+          {APP_VERSION}
+        </p>
       </div>
     </aside>
   )

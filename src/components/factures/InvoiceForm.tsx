@@ -129,11 +129,11 @@ export function InvoiceForm() {
       const atId = await createFacture(invoice)
       if (atId) invoice.atId = atId
       addFacture(invoice)
-      toast.success(`Facture ${num} créée`)
+      toast.success(`Facture ${invoice.num} créée`)
       router.push('/factures')
-    } catch {
+    } catch (e) {
       addFacture(invoice)
-      toast.warning('Facture sauvegardée localement (sync Airtable échouée)')
+      toast.warning(`Facture sauvegardée localement — Airtable a refusé : ${e instanceof Error ? e.message : 'erreur inconnue'}`)
       router.push('/factures')
     } finally {
       setSaving(false)
