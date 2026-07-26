@@ -38,6 +38,8 @@ export function InvoiceForm() {
 
   // Load template defaults on mount
   const [clientId,      setClientId]      = useState('')
+  const [num,           setNum]           = useState('')
+  const [numTouched,    setNumTouched]    = useState(false)
   const [date,          setDate]          = useState(today)
   const [echeanceIdx,   setEcheanceIdx]   = useState(2)
   const [paiement,      setPaiement]      = useState('Virement bancaire')
@@ -58,6 +60,12 @@ export function InvoiceForm() {
     }
     setTemplateLoaded(true)
   }, [templateLoaded])
+
+  // Suggest the next invoice number — editable, stops updating once the user types
+  useEffect(() => {
+    if (numTouched) return
+    setNum(generateInvoiceNum(profil.prefix || 'F-', factures.map(f => f.num)))
+  }, [factures, profil.prefix, numTouched])
 
   const selectedClient = clients.find(c => c.id === clientId)
   const echeanceOpt    = ECHEANCE_OPTIONS[echeanceIdx]
@@ -80,6 +88,9 @@ export function InvoiceForm() {
   function validate() {
     const errs: Record<string, string> = {}
     if (!clientId)                     errs.client  = 'Client requis'
+    if (!num.trim())                   errs.num     = 'Numéro de facture requis'
+    if (num.trim() && factures.some(f => f.num === num.trim()))
+      errs.num = `Le numéro ${num.trim()} existe déjà`
     if (!date)                         errs.date    = 'Date requise'
     if (lines.every(l => !l.desc))     errs.lines   = 'Au moins une ligne de prestation requise'
     if (lines.some(l => l.desc && l.pu <= 0)) errs.lines = 'Le prix unitaire doit être supérieur à 0'
@@ -93,12 +104,11 @@ export function InvoiceForm() {
     if (!validate()) return
     setSaving(true)
 
-    const num = generateInvoiceNum(profil.prefix || 'F-', factures.map(f => f.num))
     const validLines = lines.filter(l => l.desc && l.pu > 0)
 
     const invoice: Invoice = {
       id:           uid(),
-      num,
+      num:          num.trim(),
       date,
       echeance:     echeanceDate,
       echeanceLabel: echeanceOpt.label,
@@ -165,6 +175,24 @@ export function InvoiceForm() {
               {selectedClient.adresse && <div className="truncate" style={{ color: 'rgba(255,255,255,0.4)' }}>{selectedClient.adresse}</div>}
             </div>
           ) : <div />}
+
+          {/* Numéro */}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.45)' }}>
+              Numéro de facture <span className="text-violet-400">*</span>
+            </label>
+            <input
+              type="text"
+              value={num}
+              onChange={e => { setNum(e.target.value); setNumTouched(true) }}
+              placeholder="TNS-2026-2036"
+              className="input-dark w-full"
+              style={errors.num ? { borderColor: 'rgba(248,113,113,0.6)' } : {}}
+            />
+            {errors.num
+              ? <p className="mt-1 text-xs text-red-400">{errors.num}</p>
+              : <p className="mt-1 text-xs" style={{ color: 'rgba(255,255,255,0.25)' }}>Proposé automatiquement — modifiable librement</p>}
+          </div>
 
           {/* Date */}
           <div>
