@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 
 // Bump on every deploy — lets us check at a glance that the browser runs the latest build
-export const APP_VERSION = 'v2.2 — 27/07/2026'
+export const APP_VERSION = 'v2.3 — 27/07/2026'
 
 const NAV_ITEMS = [
   { href: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard',      group: 'main' },

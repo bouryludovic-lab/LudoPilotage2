@@ -154,8 +154,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ syncing: true, syncError: null })
     try {
       const { factures, clients, profil } = await serverSyncAll()
-      const localFactures = get().factures.filter(f => !f.atId)
-      const localClients  = get().clients.filter(c => !c.atId)
+      // Keep local-only records, but drop ghosts that duplicate a server record
+      const localFactures = get().factures.filter(f =>
+        !f.atId && !factures.some(s => s.num === f.num))
+      const localClients  = get().clients.filter(c =>
+        !c.atId && !clients.some(s => s.nom.trim().toLowerCase() === c.nom.trim().toLowerCase()))
       const merged = {
         factures:   [...factures, ...localFactures],
         clients:    [...clients, ...localClients],
